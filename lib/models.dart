@@ -661,12 +661,10 @@ enum PaymentMethod {
 
 /// Métodos de pago exclusivos de TIENDA FÍSICA (Caja / Ventas).
 enum PhysicalPaymentMethod {
-  pos('Punto de Venta', 'Tarjeta débito / crédito en tienda (Bs)', Icons.point_of_sale, Color(0xFF6A1B9A)),
   pagoMovil('Pago Móvil', 'Transferencia inmediata en Bs', Icons.phone_android, Color(0xFF00897B)),
-  cashUsd('Efectivo Dólares (\$)', 'Pago en divisas en caja', Icons.attach_money, Color(0xFF2E7D32)),
-  cashBs('Efectivo Bolívares (Bs)', 'Pago en efectivo moneda nacional', Icons.payments_outlined, Color(0xFFEF6C00)),
   zelle('Zelle', 'Transferencia en dólares (\$)', Icons.flash_on, Color(0xFF6D1ED4)),
-  transfer('Transferencia bancaria', 'Transferencia nacional en Bs', Icons.account_balance, Color(0xFF1565C0));
+  cashUsd('Efectivo Dólares (\$)', 'Pago en divisas en caja', Icons.attach_money, Color(0xFF2E7D32)),
+  cashBs('Efectivo Bolívares (Bs)', 'Pago en efectivo moneda nacional', Icons.payments_outlined, Color(0xFFEF6C00));
 
   const PhysicalPaymentMethod(this.label, this.subtitle, this.icon, this.color);
   final String label;

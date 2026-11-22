@@ -81,13 +81,12 @@ class _CashierPosViewState extends State<CashierPosView> {
   String? _catId;
   final List<CartItem> _saleItems = [];
 
-  bool _walkInCustomer = true;
   final _custForm = GlobalKey<FormState>();
   final _custName = TextEditingController();
   final _custDoc = TextEditingController();
   final _custPhone = TextEditingController();
 
-  PhysicalPaymentMethod _method = PhysicalPaymentMethod.pos;
+  PhysicalPaymentMethod _method = PhysicalPaymentMethod.pagoMovil;
   final _payForm = GlobalKey<FormState>();
   final _refCtrl = TextEditingController();
   final _zelleCtrl = TextEditingController();
@@ -140,10 +139,7 @@ class _CashierPosViewState extends State<CashierPosView> {
 
   String get _paymentDetail {
     switch (_method) {
-      case PhysicalPaymentMethod.pos:
-        return _refCtrl.text.trim().isNotEmpty ? 'Lote / Últ. 4: ${_refCtrl.text.trim()}' : 'Punto en tienda';
       case PhysicalPaymentMethod.pagoMovil:
-      case PhysicalPaymentMethod.transfer:
         return 'Ref: ${_refCtrl.text.trim()}';
       case PhysicalPaymentMethod.zelle:
         return 'Zelle: ${_zelleCtrl.text.trim()}';
@@ -156,8 +152,16 @@ class _CashierPosViewState extends State<CashierPosView> {
 
   Future<void> _checkout(AppState state) async {
     if (_saleItems.isEmpty) return;
-    if (!_walkInCustomer && !(_custForm.currentState?.validate() ?? false)) return;
-    if (!(_payForm.currentState?.validate() ?? true)) return;
+    final custOk = _custForm.currentState?.validate() ?? false;
+    final payOk = _payForm.currentState?.validate() ?? true;
+    if (!custOk) {
+      showSnack(context, 'Completa los datos del cliente (Nombre, Cédula y Teléfono)', error: true);
+      return;
+    }
+    if (!payOk) {
+      showSnack(context, 'Completa los datos del método de pago', error: true);
+      return;
+    }
 
     // Verifica stock por color antes de cobrar
     for (final item in _saleItems) {
@@ -170,9 +174,9 @@ class _CashierPosViewState extends State<CashierPosView> {
 
     final order = await state.placePhysicalSale(
       saleItems: _saleItems,
-      customerName: _walkInCustomer ? 'Cliente de mostrador' : _custName.text.trim(),
-      customerDocument: _walkInCustomer ? '' : _custDoc.text.trim(),
-      customerPhone: _walkInCustomer ? '' : _custPhone.text.trim(),
+      customerName: _custName.text.trim(),
+      customerDocument: _custDoc.text.trim(),
+      customerPhone: _custPhone.text.trim(),
       paymentMethod: _method.label,
       paymentDetails: _paymentDetail,
     );
@@ -185,7 +189,6 @@ class _CashierPosViewState extends State<CashierPosView> {
       _custPhone.clear();
       _refCtrl.clear();
       _zelleCtrl.clear();
-      _walkInCustomer = true;
     });
 
     await showDialog(
@@ -368,53 +371,42 @@ class _CashierPosViewState extends State<CashierPosView> {
                 ),
             ]),
             const Divider(),
-            // Datos del cliente físico
-            Row(children: [
-              ChoiceChip(
-                label: const Text('Cliente de mostrador'),
-                selected: _walkInCustomer,
-                onSelected: (_) => setState(() => _walkInCustomer = true),
-              ),
-              const SizedBox(width: 8),
-              ChoiceChip(
-                label: const Text('Registrar datos del cliente'),
-                selected: !_walkInCustomer,
-                onSelected: (_) => setState(() => _walkInCustomer = false),
-              ),
-            ]),
-            if (!_walkInCustomer) ...[
-              const SizedBox(height: 10),
-              Form(
-                key: _custForm,
-                child: Column(children: [
-                  TextFormField(
-                    controller: _custName,
-                    inputFormatters: [nameInputFormatter],
-                    decoration: const InputDecoration(labelText: 'Nombre y apellido', isDense: true),
-                    validator: validateFullName,
+            // Datos del cliente físico (obligatorios para respaldo de la compra)
+            const Text('Datos del cliente', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Form(
+              key: _custForm,
+              child: Column(children: [
+                TextFormField(
+                  controller: _custName,
+                  inputFormatters: [nameInputFormatter],
+                  decoration: const InputDecoration(labelText: 'Nombre y apellido', isDense: true),
+                  validator: validateFullName,
+                ),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _custDoc,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+                      decoration: const InputDecoration(labelText: 'Cédula', isDense: true),
+                      validator: (v) => (v ?? '').trim().length >= 6 ? null : 'Ingresa la cédula',
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _custDoc,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
-                        decoration: const InputDecoration(labelText: 'Cédula (opcional)', isDense: true),
-                      ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _custPhone,
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: const [PlusDigitsPhoneFormatter()],
+                      decoration: const InputDecoration(labelText: 'Teléfono', isDense: true),
+                      validator: validatePhone,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _custPhone,
-                        inputFormatters: const [PlusDigitsPhoneFormatter()],
-                        decoration: const InputDecoration(labelText: 'Teléfono (opcional)', isDense: true),
-                        validator: (v) => (v ?? '').trim().isEmpty ? null : validatePhone(v),
-                      ),
-                    ),
-                  ]),
+                  ),
                 ]),
-              ),
-            ],
+              ]),
+            ),
             const SizedBox(height: 12),
             if (_saleItems.isEmpty)
               Container(
@@ -540,19 +532,7 @@ class _CashierPosViewState extends State<CashierPosView> {
 
   Widget _physicalPaymentField(double total, double rate) {
     switch (_method) {
-      case PhysicalPaymentMethod.pos:
-        return TextFormField(
-          controller: _refCtrl,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(8)],
-          decoration: InputDecoration(
-            labelText: 'Últimos 4 dígitos / N° lote (opcional)',
-            helperText: 'Monto a pasar por punto: ${bs(total, rate)}',
-            isDense: true,
-          ),
-        );
       case PhysicalPaymentMethod.pagoMovil:
-      case PhysicalPaymentMethod.transfer:
         return TextFormField(
           controller: _refCtrl,
           keyboardType: TextInputType.number,
