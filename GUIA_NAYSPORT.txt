@@ -15,8 +15,10 @@
   sesión" y el carrito.
 - Menú izquierdo con categorías (Casual, Deportiva, Calzado, Prendas, Perfumes,
   Accesorios). Cada producto muestra su precio en dólares ($) y bolívares (Bs).
-- Al hacer clic en un producto puedes elegir color, talla y cantidad. Si lleva
-  varias unidades (ej. 3+, 5+, 10+), el sistema aplica un descuento automático.
+- Al hacer clic en un producto puedes elegir color, talla y cantidad. También
+  puedes combinar varios colores/tallas del mismo producto ("Añadir y elegir
+  otro color/talla"). Si llevas varias unidades (ej. 3+, 5+, 10+), el sistema
+  aplica un descuento automático sumando todas las variantes.
 - Para pagar pide iniciar sesión o registrarse (nombre completo solo letras,
   correo, teléfono solo números y '+', fecha de nacimiento +18 y contraseña
   segura).

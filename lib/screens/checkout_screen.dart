@@ -26,7 +26,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   PaymentMethod _method = PaymentMethod.paypal;
   String _cashCurrency = 'Dólares en efectivo (\$)';
-  final _cashChangeFor = TextEditingController();
 
   final _cardNumber = TextEditingController();
   final _cardName = TextEditingController();
@@ -61,7 +60,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _postal.dispose();
     _city.dispose();
     _address.dispose();
-    _cashChangeFor.dispose();
     _cardNumber.dispose();
     _cardName.dispose();
     _cardExp.dispose();
@@ -96,8 +94,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       case PaymentMethod.transfer:
         return '${_transferBank.text.trim()} • Ref: ${_transferRef.text.trim()}';
       case PaymentMethod.cash:
-        final extra = _cashChangeFor.text.trim();
-        return extra.isNotEmpty ? '$_cashCurrency (paga con $extra)' : _cashCurrency;
+        return _cashCurrency;
       default:
         return 'Autorización digital vía ${_method.label}';
     }
@@ -436,13 +433,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               suffixText: brand,
             ),
             onChanged: (_) => setState(() {}),
-            validator: (v) => _luhn(v ?? '') ? null : 'Número de tarjeta inválido',
+            validator: (v) =>
+                _luhn(v ?? '') ? null : 'Número de tarjeta inválido (para prueba usa 4242424242424242)',
           ),
           const SizedBox(height: 14),
           TextFormField(
             controller: _cardName,
-            decoration: const InputDecoration(labelText: 'Nombre impreso en la tarjeta', prefixIcon: Icon(Icons.person_outline)),
-            validator: (v) => (v ?? '').trim().length < 3 ? 'Requerido' : null,
+            inputFormatters: [nameInputFormatter],
+            decoration: const InputDecoration(
+                labelText: 'Nombre impreso en la tarjeta', prefixIcon: Icon(Icons.person_outline)),
+            validator: (v) {
+              final t = (v ?? '').trim();
+              if (RegExp(r'\d').hasMatch(t)) return 'El nombre no puede llevar números';
+              return t.length < 3 ? 'Ingresa el nombre del titular' : null;
+            },
           ),
           const SizedBox(height: 14),
           Row(children: [
@@ -598,15 +602,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ]),
           const SizedBox(height: 14),
-          TextFormField(
-            controller: _cashChangeFor,
-            decoration: const InputDecoration(
-              labelText: '¿Con cuánto pagas? (opcional, para llevar vuelto)',
-              prefixIcon: Icon(Icons.money),
-              hintText: 'Ej: Billete de \$100 o monto exacto',
-            ),
-          ),
-          const SizedBox(height: 12),
           _InfoBox('Pagarás en efectivo al momento de recibir o retirar tu pedido.', color: _method.color),
         ]);
       default:

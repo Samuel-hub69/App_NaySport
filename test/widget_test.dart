@@ -54,8 +54,9 @@ void main() {
     expect(shirt.costPrice, 9.50);
     expect(state.movements.first.type, 'entrada');
 
-    // Agregar 5 camisas con color y talla -> aplica 10% de descuento
-    expect(state.add(shirt, size: 'M', color: 'Rosado', qty: 5), isTrue);
+    // Agregar 5 camisas combinando 2 colores distintos -> aplica 10% de descuento al total
+    expect(state.add(shirt, size: 'M', color: 'Negro', qty: 2), isTrue);
+    expect(state.add(shirt, size: 'L', color: 'Blanco', qty: 3), isTrue);
     expect(state.discountTotal, closeTo(shirt.price * 5 * 0.10, 0.01));
 
     // Formato en dólares y bolívares + validaciones de nombre y teléfono
@@ -101,7 +102,7 @@ void main() {
     expect(reloaded.orders.first.customerPhone, '+58 414 9998877');
     expect(reloaded.suppliers.length, 1);
     expect(reloaded.purchases.length, 1);
-    expect(reloaded.movements.length, 3);
+    expect(reloaded.movements.length, 4);
     expect(reloaded.settings.customColors['Turquesa'], 0xFF009688);
 
     // Generar los 4 PDFs y verificar cabecera %PDF-

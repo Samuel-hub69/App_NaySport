@@ -365,6 +365,7 @@ class _ProductDialogState extends State<ProductDialog> {
   String? _color;
   int _qty = 1;
   bool _triedSubmit = false;
+  final List<({String? color, String? size, int qty})> _bundle = [];
 
   @override
   void initState() {
@@ -380,22 +381,53 @@ class _ProductDialogState extends State<ProductDialog> {
     return null;
   }
 
+  void _addVariantAndChooseAnother(int remainingForNew) {
+    if (_missing != null) {
+      setState(() => _triedSubmit = true);
+      showSnack(context, _missing!, error: true);
+      return;
+    }
+    if (remainingForNew <= 0) return;
+    final addQty = _qty.clamp(1, remainingForNew);
+    final p = widget.product;
+    setState(() {
+      final idx = _bundle.indexWhere((e) => e.color == _color && e.size == _size);
+      if (idx >= 0) {
+        final prev = _bundle[idx];
+        _bundle[idx] = (color: prev.color, size: prev.size, qty: prev.qty + addQty);
+      } else {
+        _bundle.add((color: _color, size: _size, qty: addQty));
+      }
+      _color = p.colors.length == 1 ? p.colors.first : null;
+      _size = p.sizes.length == 1 ? p.sizes.first : null;
+      _qty = 1;
+      _triedSubmit = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final p = widget.product;
     final available = state.availableFor(p);
+    final bundleQty = _bundle.fold(0, (s, e) => s + e.qty);
+    final remaining = (available - bundleQty).clamp(0, available);
+    final safeQty = remaining == 0 ? 0 : _qty.clamp(1, remaining);
+    final hasCurrentReady = _missing == null && safeQty > 0;
+    final totalSelected = bundleQty + ((_bundle.isEmpty || hasCurrentReady) ? safeQty : 0);
+
     final inCart = state.qtyInCart(p.id);
-    final pct = state.discountFor(inCart + _qty);
-    final gross = p.price * _qty;
+    final pct = state.discountFor(inCart + totalSelected);
+    final gross = p.price * totalSelected;
     final rules = [...state.settings.discounts]..sort((a, b) => a.minQty.compareTo(b.minQty));
+    final canCombine = p.colors.length > 1 || p.sizes.length > 1;
 
     return Dialog(
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: SizedBox(
-        width: 860,
-        height: 580,
+        width: 880,
+        height: 620,
         child: Row(children: [
           SizedBox(
             width: 360,
@@ -463,24 +495,63 @@ class _ProductDialogState extends State<ProductDialog> {
                     const SizedBox(width: 16),
                     IconButton.outlined(
                       icon: const Icon(Icons.remove),
-                      onPressed: _qty > 1 ? () => setState(() => _qty--) : null,
+                      onPressed: safeQty > 1 ? () => setState(() => _qty = safeQty - 1) : null,
                     ),
                     SizedBox(
                       width: 44,
-                      child: Text('$_qty', textAlign: TextAlign.center, style: const TextStyle(fontSize: 18)),
+                      child: Text('$safeQty', textAlign: TextAlign.center, style: const TextStyle(fontSize: 18)),
                     ),
                     IconButton.outlined(
                       icon: const Icon(Icons.add),
-                      onPressed: _qty < available ? () => setState(() => _qty++) : null,
+                      onPressed: safeQty < remaining ? () => setState(() => _qty = safeQty + 1) : null,
                     ),
+                    if (canCombine && remaining > 0) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.add_circle_outline, size: 18),
+                          label: const Text('Añadir y elegir otro color/talla'),
+                          onPressed: () => _addVariantAndChooseAnother(remaining),
+                        ),
+                      ),
+                    ],
                   ]),
+                  if (_bundle.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: NayColors.logoBg.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: NayColors.primary.withValues(alpha: 0.3)),
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Combinación armada ($bundleQty unid.):',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                        const SizedBox(height: 6),
+                        Wrap(spacing: 6, runSpacing: 6, children: [
+                          for (var i = 0; i < _bundle.length; i++)
+                            Chip(
+                              visualDensity: VisualDensity.compact,
+                              avatar: _bundle[i].color != null ? ColorDot(_bundle[i].color!, size: 14) : null,
+                              label: Text(
+                                '${_bundle[i].qty}× ${[?_bundle[i].color, if (_bundle[i].size != null) 'Talla ${_bundle[i].size}'].join(' • ')}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              onDeleted: () => setState(() => _bundle.removeAt(i)),
+                            ),
+                        ]),
+                      ]),
+                    ),
+                  ],
                   if (rules.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Wrap(spacing: 6, runSpacing: 6, children: [
                       for (final r in rules)
                         Chip(
                           visualDensity: VisualDensity.compact,
-                          backgroundColor: inCart + _qty >= r.minQty ? Colors.green.shade100 : Colors.pink.shade50,
+                          backgroundColor: inCart + totalSelected >= r.minQty ? Colors.green.shade100 : Colors.pink.shade50,
                           label: Text('${r.minQty}+ unid: -${r.percent.toStringAsFixed(0)}%',
                               style: const TextStyle(fontSize: 12)),
                         ),
@@ -489,7 +560,7 @@ class _ProductDialogState extends State<ProductDialog> {
                   const SizedBox(height: 14),
                   if (pct > 0)
                     Text(
-                      '¡Descuento de ${pct.toStringAsFixed(0)}% aplicado! '
+                      '¡Descuento de ${pct.toStringAsFixed(0)}% aplicado por llevar $totalSelected unidades! '
                       'Pagas ${usd(gross * (1 - pct / 100))} en vez de ${usd(gross)}',
                       style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600),
                     ),
@@ -498,23 +569,38 @@ class _ProductDialogState extends State<ProductDialog> {
                     width: double.infinity,
                     child: FilledButton.icon(
                       icon: const Icon(Icons.shopping_bag),
-                      label: Text(available <= 0 ? 'Sin stock disponible' : 'Agregar $_qty al carrito'),
+                      label: Text(available <= 0
+                          ? 'Sin stock disponible'
+                          : (_bundle.isEmpty
+                              ? 'Agregar $safeQty al carrito'
+                              : 'Agregar $totalSelected al carrito')),
                       onPressed: available <= 0
                           ? null
                           : () {
-                              if (_missing != null) {
+                              if (_bundle.isEmpty && _missing != null) {
                                 setState(() => _triedSubmit = true);
                                 showSnack(context, _missing!, error: true);
                                 return;
                               }
-                              final ok = state.add(p, size: _size, color: _color, qty: _qty);
+                              var addedCount = 0;
+                              for (final item in _bundle) {
+                                if (state.add(p, size: item.size, color: item.color, qty: item.qty)) {
+                                  addedCount += item.qty;
+                                }
+                              }
+                              if (hasCurrentReady && state.add(p, size: _size, color: _color, qty: safeQty)) {
+                                addedCount += safeQty;
+                              }
                               Navigator.pop(context);
-                              showSnack(context, ok ? '$_qty × ${p.name} agregado al carrito' : 'No hay stock suficiente',
-                                  error: !ok);
+                              showSnack(
+                                context,
+                                addedCount > 0 ? '$addedCount × ${p.name} agregado al carrito' : 'No hay stock suficiente',
+                                error: addedCount == 0,
+                              );
                             },
                     ),
                   ),
-                  if (_triedSubmit && _missing != null)
+                  if (_triedSubmit && _missing != null && _bundle.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(_missing!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
