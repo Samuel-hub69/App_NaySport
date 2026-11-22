@@ -388,14 +388,18 @@ class _CashierPosViewState extends State<CashierPosView> {
                   validator: validateFullName,
                 ),
                 const SizedBox(height: 8),
-                Row(children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Expanded(
                     child: TextFormField(
                       controller: _custDoc,
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
-                      decoration: const InputDecoration(labelText: 'Cédula', isDense: true),
-                      validator: (v) => (v ?? '').trim().length >= 6 ? null : 'Ingresa la cédula',
+                      decoration: const InputDecoration(
+                        labelText: 'Cédula',
+                        hintText: 'Hasta 10 dígitos',
+                        isDense: true,
+                      ),
+                      validator: validateCedula,
                     ),
                   ),
                   const SizedBox(width: 8),

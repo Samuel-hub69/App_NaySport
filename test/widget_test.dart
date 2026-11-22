@@ -107,6 +107,11 @@ void main() {
     expect(validateFullName('María 123'), isNotNull);
     expect(validatePhone('+584141234567'), isNull);
     expect(validatePhone('0414-abc'), isNotNull);
+    expect(validateCedula('123456'), isNull);
+    expect(validateCedula('20123456'), isNull);
+    expect(validateCedula('1234567890'), isNull);
+    expect(validateCedula('12345'), isNotNull);
+    expect(validateCedula('12345678901'), isNotNull);
 
     final onlineOrder = await state.placeOrder(
       customerPhone: '+584149998877',
@@ -167,6 +172,10 @@ void main() {
     expect(find.text('Cédula'), findsOneWidget);
     expect(find.text('Teléfono'), findsOneWidget);
     expect(find.text('Dirección'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextFormField, 'Cédula'), '123456789012');
+    await tester.pump();
+    expect(find.text('1234567890'), findsOneWidget);
+    expect(find.text('123456789012'), findsNothing);
     expect(find.text('Pago Móvil'), findsOneWidget);
     expect(find.text('Zelle'), findsOneWidget);
     expect(find.text('Efectivo Dólares (\$)'), findsOneWidget);

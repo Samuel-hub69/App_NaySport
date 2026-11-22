@@ -63,3 +63,10 @@ String? validatePhone(String? v) {
   }
   return null;
 }
+
+String? validateCedula(String? v) {
+  final t = (v ?? '').trim();
+  if (t.isEmpty) return 'Ingresa la cédula';
+  if (!RegExp(r'^\d{6,10}$').hasMatch(t)) return 'Entre 6 y 10 dígitos';
+  return null;
+}
