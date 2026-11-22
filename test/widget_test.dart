@@ -32,7 +32,7 @@ void main() {
     expect(state.loginWithEmail(kDefaultAdminEmail, kDefaultAdminPassword), isNull);
     expect(state.isAdmin, isTrue);
 
-    final shirt = state.products.firstWhere((p) => p.id == 'c4');
+    final shirt = state.products.firstWhere((p) => p.id == 'r2');
     final initialStock = shirt.stock;
     final initialPrice = shirt.price;
 

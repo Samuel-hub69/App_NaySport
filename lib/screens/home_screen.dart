@@ -364,6 +364,7 @@ class _ProductDialogState extends State<ProductDialog> {
   String? _size;
   String? _color;
   int _qty = 1;
+  bool _triedSubmit = false;
 
   @override
   void initState() {
@@ -374,8 +375,8 @@ class _ProductDialogState extends State<ProductDialog> {
 
   String? get _missing {
     final p = widget.product;
-    if (p.colors.isNotEmpty && _color == null) return 'Selecciona un color';
-    if (p.sizes.isNotEmpty && _size == null) return 'Selecciona una talla';
+    if (p.colors.isNotEmpty && _color == null) return 'Elige un color para agregar al carrito';
+    if (p.sizes.isNotEmpty && _size == null) return 'Elige una talla para agregar al carrito';
     return null;
   }
 
@@ -423,23 +424,29 @@ class _ProductDialogState extends State<ProductDialog> {
                   ),
                   if (p.colors.isNotEmpty) ...[
                     const SizedBox(height: 18),
-                    Text('Color: ${_color ?? ''}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Row(children: [
+                      Text('Color: ${_color ?? 'Sin elegir'}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                      if (_triedSubmit && _color == null)
+                        const Text('  ← Elige uno', style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ]),
                     const SizedBox(height: 8),
-                    Wrap(spacing: 10, runSpacing: 10, children: [
+                    Wrap(spacing: 8, runSpacing: 8, children: [
                       for (final c in p.colors)
-                        Tooltip(
-                          message: c,
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: () => setState(() => _color = c),
-                            child: ColorDot(c, size: 34, selected: _color == c),
-                          ),
+                        ChoiceChip(
+                          avatar: ColorDot(c, size: 18),
+                          label: Text(c),
+                          selected: _color == c,
+                          onSelected: (_) => setState(() => _color = c),
                         ),
                     ]),
                   ],
                   if (p.sizes.isNotEmpty) ...[
                     const SizedBox(height: 18),
-                    const Text('Talla', style: TextStyle(fontWeight: FontWeight.w600)),
+                    Row(children: [
+                      Text('Talla: ${_size ?? 'Sin elegir'}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                      if (_triedSubmit && _size == null)
+                        const Text('  ← Elige una', style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.w600)),
+                    ]),
                     const SizedBox(height: 8),
                     Wrap(spacing: 8, runSpacing: 8, children: [
                       for (final s in p.sizes)
@@ -491,10 +498,15 @@ class _ProductDialogState extends State<ProductDialog> {
                     width: double.infinity,
                     child: FilledButton.icon(
                       icon: const Icon(Icons.shopping_bag),
-                      label: Text('Agregar $_qty al carrito'),
-                      onPressed: _missing != null || available <= 0
+                      label: Text(available <= 0 ? 'Sin stock disponible' : 'Agregar $_qty al carrito'),
+                      onPressed: available <= 0
                           ? null
                           : () {
+                              if (_missing != null) {
+                                setState(() => _triedSubmit = true);
+                                showSnack(context, _missing!, error: true);
+                                return;
+                              }
                               final ok = state.add(p, size: _size, color: _color, qty: _qty);
                               Navigator.pop(context);
                               showSnack(context, ok ? '$_qty × ${p.name} agregado al carrito' : 'No hay stock suficiente',
@@ -502,10 +514,10 @@ class _ProductDialogState extends State<ProductDialog> {
                             },
                     ),
                   ),
-                  if (_missing != null)
+                  if (_triedSubmit && _missing != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
-                      child: Text(_missing!, style: const TextStyle(color: Colors.grey)),
+                      child: Text(_missing!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
                     ),
                 ],
               ),

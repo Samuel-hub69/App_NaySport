@@ -147,7 +147,6 @@ normal y NO verás el botón de Panel admin).
   %APPDATA%\NaySport\naysport_db.json. En la versión final en producción esto se
   conectará a una base de datos en la nube (Firebase/Supabase) y a pasarelas
   de pago reales.
-- Imágenes actuales: los productos iniciales cargan imágenes de prueba desde
-  internet (algunas pueden salir aleatorias o mostrar el ícono rosado si no
-  cargaron a tiempo) hasta que se agreguen las fotos reales del catálogo.
+- Imágenes incluidas: los 15 productos del catálogo ya llevan sus fotos reales
+  empaquetadas dentro de la app (cargan sin necesidad de internet).
 ================================================================================

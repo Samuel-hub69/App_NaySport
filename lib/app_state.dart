@@ -44,11 +44,9 @@ class AppState extends ChangeNotifier {
       purchases = (data['purchases'] as List? ?? []).map((e) => SupplierPurchase.fromJson(e)).toList();
       movements = (data['movements'] as List? ?? []).map((e) => StockMovement.fromJson(e)).toList();
       settings = Settings.fromJson(data['settings'] ?? {});
-      for (final p in products) {
-        if (p.id == 'a1' && p.image.contains('handbag?lock=61')) p.image = '';
-      }
       final dbVersion = (data['version'] as num?)?.toInt() ?? 1;
-      if (dbVersion < 5) {
+      if (dbVersion < 6) {
+        products.removeWhere((p) => kLegacyDummyIds.contains(p.id));
         final newSeeds = seedProducts().where((p) => p.id.startsWith('r')).toList();
         var insertAt = 0;
         for (final sp in newSeeds) {
@@ -73,7 +71,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> save() => LocalDb.write({
-        'version': 5,
+        'version': 6,
         'categories': categories.map((e) => e.toJson()).toList(),
         'products': products.map((e) => e.toJson()).toList(),
         'orders': orders.map((e) => e.toJson()).toList(),
