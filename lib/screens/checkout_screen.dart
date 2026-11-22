@@ -25,7 +25,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _address = TextEditingController();
 
   PaymentMethod _method = PaymentMethod.paypal;
-  String _cashCurrency = 'Dólares en efectivo (\$)';
 
   final _cardNumber = TextEditingController();
   final _cardName = TextEditingController();
@@ -37,8 +36,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _pagoMovilRef = TextEditingController();
   final _zelleAccount = TextEditingController();
   final _zelleRef = TextEditingController();
-  final _transferBank = TextEditingController();
-  final _transferRef = TextEditingController();
 
   Order? _completedOrder;
   bool _prefilled = false;
@@ -70,13 +67,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _pagoMovilRef.dispose();
     _zelleAccount.dispose();
     _zelleRef.dispose();
-    _transferBank.dispose();
-    _transferRef.dispose();
     super.dispose();
   }
 
-  String get _paymentDescription =>
-      _method == PaymentMethod.cash ? 'Efectivo ($_cashCurrency)' : _method.label;
+  String get _paymentDescription => _method.label;
 
   String get _paymentSummaryDetail {
     switch (_method) {
@@ -91,10 +85,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return '${_pagoMovilBank.text.trim()} • Tel: ${_pagoMovilPhone.text.trim()} • Ref: ${_pagoMovilRef.text.trim()}';
       case PaymentMethod.zelle:
         return 'De: ${_zelleAccount.text.trim()} • Conf: ${_zelleRef.text.trim()}';
-      case PaymentMethod.transfer:
-        return '${_transferBank.text.trim()} • Ref: ${_transferRef.text.trim()}';
-      case PaymentMethod.cash:
-        return _cashCurrency;
       default:
         return 'Autorización digital vía ${_method.label}';
     }
@@ -555,54 +545,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           ]),
-        ]);
-      case PaymentMethod.transfer:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _InfoBox(
-            'Cuenta Bancaria NaySport (ejemplo):\n'
-            '• Banco: Banesco Cuenta Corriente 0134-0000-00-0000000000\n'
-            '• Monto: ${usd(total)} / ${bs(total, rate)}',
-            color: _method.color,
-          ),
-          const SizedBox(height: 14),
-          Row(children: [
-            Expanded(
-              child: TextFormField(
-                controller: _transferBank,
-                decoration: const InputDecoration(labelText: 'Banco origen', prefixIcon: Icon(Icons.account_balance)),
-                validator: (v) => (v ?? '').trim().length < 3 ? 'Ingresa tu banco' : null,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _transferRef,
-                decoration: const InputDecoration(labelText: 'Número de referencia', prefixIcon: Icon(Icons.tag)),
-                validator: (v) => (v ?? '').trim().length < 4 ? 'Ingresa la referencia' : null,
-              ),
-            ),
-          ]),
-        ]);
-      case PaymentMethod.cash:
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Elige en qué moneda física pagarás:', style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 10),
-          Wrap(spacing: 10, runSpacing: 10, children: [
-            ChoiceChip(
-              avatar: const Icon(Icons.attach_money, size: 18),
-              label: Text('Dólares en efectivo (${usd(total)})'),
-              selected: _cashCurrency.startsWith('Dólares'),
-              onSelected: (_) => setState(() => _cashCurrency = 'Dólares en efectivo (\$)'),
-            ),
-            ChoiceChip(
-              avatar: const Icon(Icons.payments_outlined, size: 18),
-              label: Text('Bolívares en efectivo (${bs(total, rate)})'),
-              selected: _cashCurrency.startsWith('Bolívares'),
-              onSelected: (_) => setState(() => _cashCurrency = 'Bolívares en efectivo (Bs)'),
-            ),
-          ]),
-          const SizedBox(height: 14),
-          _InfoBox('Pagarás en efectivo al momento de recibir o retirar tu pedido.', color: _method.color),
         ]);
       default:
         return _InfoBox(

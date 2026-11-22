@@ -43,6 +43,10 @@ void main() {
       PhysicalPaymentMethod.values.map((m) => m.label).toList(),
       ['Punto de Venta', 'Pago Móvil', 'Zelle', 'Efectivo Dólares (\$)', 'Efectivo Bolívares (Bs)'],
     );
+    expect(
+      PaymentMethod.values.map((m) => m.label).toList(),
+      ['PayPal', 'Tarjeta de crédito / débito', 'Pago Móvil', 'Zelle', 'Google Pay', 'Apple Pay'],
+    );
 
     // Venta en tienda física de 3 pares distintos -> aplica descuento 3+ (-5%) y descuenta stock por color
     final nikeBlack = state.products.firstWhere((p) => p.id == 'r1'); // $45, cost $40, Negro:9, Blanco:6

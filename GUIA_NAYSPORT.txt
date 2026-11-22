@@ -35,7 +35,7 @@ Credenciales de prueba incluidas:
   1) Dirección de envío (país, teléfono, código postal validado por país,
      ciudad y dirección).
   2) Método de pago online (PayPal, Tarjeta con validación Luhn, Pago Móvil,
-     Zelle, Transferencia, Google Pay, Apple Pay o Efectivo al recibir).
+     Zelle, Google Pay o Apple Pay).
   3) Confirmar pedido (al finalizar descuenta el stock del color elegido).
 
 3. CÓMO FUNCIONA LA VISTA DEL CAJERO (TIENDA FÍSICA)

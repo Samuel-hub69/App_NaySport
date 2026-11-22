@@ -641,16 +641,14 @@ class Country {
   const Country(this.name, this.code, this.flag, this.postalHint, this.postalPattern);
 }
 
-/// Métodos de pago para tienda ONLINE.
+/// Métodos de pago exclusivos para tienda ONLINE.
 enum PaymentMethod {
   paypal('PayPal', 'Pago rápido con tu cuenta PayPal', Icons.account_balance_wallet, Color(0xFF003087)),
   card('Tarjeta de crédito / débito', 'Visa, Mastercard o débito internacional', Icons.credit_card, Color(0xFF6A1B9A)),
   pagoMovil('Pago Móvil', 'Transferencia inmediata en Bs', Icons.phone_android, Color(0xFF00897B)),
   zelle('Zelle', 'Envío directo en dólares (\$)', Icons.flash_on, Color(0xFF6D1ED4)),
-  transfer('Transferencia bancaria', 'Depósito o transferencia nacional', Icons.account_balance, Color(0xFF2E7D32)),
   googlePay('Google Pay', 'Pago con billetera Google', Icons.g_mobiledata, Color(0xFF1A73E8)),
-  applePay('Apple Pay', 'Pago rápido con Apple Pay', Icons.apple, Colors.black),
-  cash('Efectivo físico', 'Dólares (\$) o Bolívares (Bs) al recibir', Icons.payments, Color(0xFFEF6C00));
+  applePay('Apple Pay', 'Pago rápido con Apple Pay', Icons.apple, Colors.black);
 
   const PaymentMethod(this.label, this.subtitle, this.icon, this.color);
   final String label;
