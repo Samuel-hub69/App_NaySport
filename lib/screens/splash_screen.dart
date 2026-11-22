@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../data.dart';
+import '../app_state.dart';
 import '../main.dart' show expandMainWindow;
 import '../theme.dart';
 import 'home_screen.dart';
@@ -27,20 +27,28 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     }
   }
 
-  /// Precarga el logo y las imágenes de los productos para que todo esté listo al entrar.
+  /// Carga la base de datos y precarga las imágenes para que todo esté listo al entrar.
   Future<void> _load() async {
-    final total = kProducts.length;
-    var done = 0;
+    final state = AppScope.read(context);
     await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    setState(() => _status = 'Cargando base de datos...');
+    await state.load();
     if (!mounted) return;
     await precacheImage(const AssetImage('assets/logo.png'), context);
     if (!mounted) return;
     setState(() => _status = 'Cargando catálogo...');
-    await Future.wait(kProducts.map((p) async {
-      try {
-        await precacheImage(NetworkImage(p.imageUrl), context)
-            .timeout(const Duration(seconds: 8));
-      } catch (_) {/* sin conexión: se usará el fallback */}
+
+    final products = state.activeProducts;
+    final total = products.isEmpty ? 1 : products.length;
+    var done = 0;
+    await Future.wait(products.map((p) async {
+      final provider = ProductImage.provider(p.image);
+      if (provider != null && mounted) {
+        try {
+          await precacheImage(provider, context, onError: (_, _) {}).timeout(const Duration(seconds: 5));
+        } catch (_) {/* sin conexión o archivo faltante: se usa el fallback */}
+      }
       done++;
       if (mounted) {
         setState(() {
@@ -76,12 +84,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const NayLogo(size: 150),
-                const SizedBox(height: 4),
-                const Text('NaySport',
-                    style: TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w800, color: NayColors.primary, letterSpacing: 1.5)),
-                const SizedBox(height: 20),
+                const NayLogo(size: 140),
+                const BrandName(fontSize: 38),
+                const SizedBox(height: 14),
                 SizedBox(
                   width: 220,
                   child: ClipRRect(

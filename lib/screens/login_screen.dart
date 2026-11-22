@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app_state.dart';
-import '../models.dart';
 import '../theme.dart';
-
-/// Usuarios registrados en memoria (simulación; luego se reemplaza por un backend real).
-final Map<String, ({String name, String password})> _registered = {};
 
 final _emailRe = RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$');
 
@@ -18,13 +14,9 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _registerMode = false;
 
-  void _success(AppUser u) {
-    AppScope.of(context).login(u);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Bienvenida, ${u.name}'),
-      behavior: SnackBarBehavior.floating,
-      width: 400,
-    ));
+  void _success() {
+    final u = AppScope.read(context).user!;
+    showSnack(context, u.isAdmin ? 'Sesión de administrador iniciada' : 'Bienvenida, ${u.name}');
     Navigator.pop(context, true);
   }
 
@@ -44,7 +36,8 @@ class _LoginScreenState extends State<LoginScreen> {
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
     Navigator.pop(context);
-    _success(const AppUser(name: 'Usuaria Facebook', email: 'usuario@facebook.com', provider: 'facebook'));
+    AppScope.read(context).loginFacebook();
+    _success();
   }
 
   @override
@@ -53,12 +46,30 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Row(children: [
         Expanded(
           child: Stack(fit: StackFit.expand, children: [
-            const NetImage('https://loremflickr.com/900/1200/fashion,model?lock=7'),
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [NayColors.dark, NayColors.primary, NayColors.accent],
+                ),
+              ),
+            ),
+            const ProductImage('https://loremflickr.com/900/1200/fashion,model?lock=7'),
             Container(color: NayColors.dark.withValues(alpha: 0.45)),
             const Center(
-              child: Text('Viste tu estilo.\nViste NaySport.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  NayLogo(size: 110),
+                  SizedBox(height: 12),
+                  BrandName(fontSize: 48, color: Colors.white),
+                  SizedBox(height: 12),
+                  Text('Viste tu estilo.\nModa casual y deportiva para ella.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)),
+                ],
+              ),
             ),
             Positioned(
               top: 16,
@@ -118,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 class _LoginForm extends StatefulWidget {
-  final void Function(AppUser) onSuccess;
+  final VoidCallback onSuccess;
   const _LoginForm({super.key, required this.onSuccess});
 
   @override
@@ -134,12 +145,12 @@ class _LoginFormState extends State<_LoginForm> {
 
   void _submit() {
     if (!_form.currentState!.validate()) return;
-    final u = _registered[_email.text.trim().toLowerCase()];
-    if (u == null || u.password != _pass.text) {
-      setState(() => _error = 'Correo o contraseña incorrectos');
+    final err = AppScope.read(context).loginWithEmail(_email.text, _pass.text);
+    if (err != null) {
+      setState(() => _error = err);
       return;
     }
-    widget.onSuccess(AppUser(name: u.name, email: _email.text.trim(), provider: 'email'));
+    widget.onSuccess();
   }
 
   @override
@@ -180,7 +191,7 @@ class _LoginFormState extends State<_LoginForm> {
 }
 
 class _RegisterForm extends StatefulWidget {
-  final void Function(AppUser) onSuccess;
+  final VoidCallback onSuccess;
   const _RegisterForm({super.key, required this.onSuccess});
 
   @override
@@ -220,16 +231,20 @@ class _RegisterFormState extends State<_RegisterForm> {
     if (d != null) setState(() => _birth = d);
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
     if (_birth == null) return _snack('Selecciona tu fecha de nacimiento');
     final age = DateTime.now().difference(_birth!).inDays ~/ 365;
     if (age < 18) return _snack('Debes ser mayor de 18 años para comprar');
     if (!_terms) return _snack('Debes aceptar los términos y condiciones');
-    final key = _email.text.trim().toLowerCase();
-    if (_registered.containsKey(key)) return _snack('Ese correo ya está registrado');
-    _registered[key] = (name: _name.text.trim(), password: _pass.text);
-    widget.onSuccess(AppUser(name: _name.text.trim(), email: _email.text.trim(), provider: 'email'));
+    final err = await AppScope.read(context).register(
+      name: _name.text.trim(),
+      email: _email.text.trim(),
+      phone: _phone.text.trim(),
+      password: _pass.text,
+    );
+    if (err != null) return _snack(err);
+    widget.onSuccess();
   }
 
   void _snack(String m) => ScaffoldMessenger.of(context)

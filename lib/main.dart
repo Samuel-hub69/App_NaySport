@@ -27,6 +27,7 @@ void expandMainWindow() {
   try {
     final window = WindowManager.instance.getCurrent();
     if (window == null) return;
+    window.setFrameless(false);
     window.titleBarStyle = TitleBarStyle.normal; // devuelve el marco y la barra de título
     window.isResizable = true;
     window.minimumSize = const Size(1100, 700).toNative();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app_state.dart';
+import '../format.dart';
 import '../theme.dart';
 import 'checkout_screen.dart';
 import 'login_screen.dart';
@@ -10,6 +11,7 @@ class CartScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
+    final rate = state.settings.exchangeRate;
     return Scaffold(
       appBar: AppBar(title: Text('Mi carrito (${state.itemCount})')),
       body: state.items.isEmpty
@@ -29,9 +31,10 @@ class CartScreen extends StatelessWidget {
                   child: ListView.separated(
                     padding: const EdgeInsets.all(24),
                     itemCount: state.items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (_, i) {
                       final item = state.items[i];
+                      final pct = state.discountPercentFor(item);
                       return Card(
                         elevation: 0,
                         color: Colors.white,
@@ -43,7 +46,8 @@ class CartScreen extends StatelessWidget {
                               child: SizedBox(
                                 width: 90,
                                 height: 100,
-                                child: NetImage(item.product.imageUrl, fallbackIcon: item.product.category.icon),
+                                child: ProductImage(item.product.image,
+                                    fallbackIcon: state.categoryIcon(item.product.categoryId)),
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -51,19 +55,43 @@ class CartScreen extends StatelessWidget {
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                 Text(item.product.name,
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                if (item.size != null) Text('Talla: ${item.size}'),
-                                Text('\$${item.product.price.toStringAsFixed(2)} c/u',
+                                const SizedBox(height: 4),
+                                Row(children: [
+                                  if (item.color != null) ...[
+                                    ColorDot(item.color!, size: 14),
+                                    const SizedBox(width: 6),
+                                    Text(item.color!),
+                                    const SizedBox(width: 12),
+                                  ],
+                                  if (item.size != null) Text('Talla: ${item.size}'),
+                                ]),
+                                Text('${usd(item.product.price)} c/u',
                                     style: TextStyle(color: Colors.grey.shade600)),
+                                if (pct > 0)
+                                  Text('Descuento por cantidad: -${pct.toStringAsFixed(0)}%',
+                                      style: TextStyle(color: Colors.green.shade700, fontSize: 12)),
                               ]),
                             ),
-                            IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: () => state.decrement(item)),
+                            IconButton(
+                                icon: const Icon(Icons.remove_circle_outline),
+                                onPressed: () => state.decrement(item)),
                             Text('${item.quantity}', style: const TextStyle(fontSize: 16)),
-                            IconButton(icon: const Icon(Icons.add_circle_outline), onPressed: () => state.increment(item)),
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_outline),
+                              onPressed: () {
+                                if (!state.increment(item)) showSnack(context, 'No hay más stock', error: true);
+                              },
+                            ),
                             SizedBox(
-                              width: 100,
-                              child: Text('\$${item.total.toStringAsFixed(2)}',
-                                  textAlign: TextAlign.right,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                              width: 120,
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                                if (pct > 0)
+                                  Text(usd(item.gross),
+                                      style: const TextStyle(
+                                          decoration: TextDecoration.lineThrough, color: Colors.grey, fontSize: 12)),
+                                PriceText(item.gross - state.discountAmountFor(item),
+                                    fontSize: 16, align: CrossAxisAlignment.end),
+                              ]),
                             ),
                             IconButton(
                               tooltip: 'Eliminar',
@@ -77,17 +105,24 @@ class CartScreen extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  width: 340,
+                  width: 360,
                   margin: const EdgeInsets.all(24),
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     const Text('Resumen del pedido', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 20),
-                    _row('Subtotal', state.subtotal),
-                    _row('Envío', state.shipping, freeLabel: state.shipping == 0),
+                    _row('Subtotal', usd(state.subtotal)),
+                    if (state.discountTotal > 0)
+                      _row('Descuentos', '-${usd(state.discountTotal)}', color: Colors.green.shade700),
+                    _row('Envío', state.shipping == 0 ? 'GRATIS' : usd(state.shipping),
+                        color: state.shipping == 0 ? Colors.green : null),
                     const Divider(height: 32),
-                    _row('Total', state.total, bold: true),
+                    _row('Total', usd(state.total), bold: true, color: NayColors.primary),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(bs(state.total, rate), style: TextStyle(color: Colors.grey.shade600)),
+                    ),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
@@ -116,15 +151,14 @@ class CartScreen extends StatelessWidget {
     );
   }
 
-  Widget _row(String label, double value, {bool bold = false, bool freeLabel = false}) {
+  Widget _row(String label, String value, {bool bold = false, Color? color}) {
     final style = TextStyle(fontSize: bold ? 18 : 15, fontWeight: bold ? FontWeight.bold : FontWeight.normal);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(children: [
         Text(label, style: style),
         const Spacer(),
-        Text(freeLabel ? 'GRATIS' : '\$${value.toStringAsFixed(2)}',
-            style: style.copyWith(color: freeLabel ? Colors.green : (bold ? NayColors.primary : null))),
+        Text(value, style: style.copyWith(color: color)),
       ]),
     );
   }

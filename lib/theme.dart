@@ -1,4 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'app_state.dart';
+import 'format.dart';
+import 'models.dart';
 
 class NayColors {
   static const primary = Color(0xFFF0609E); // rosa del logo
@@ -39,7 +43,7 @@ ThemeData buildTheme() {
   );
 }
 
-/// Muestra el logo de assets/logo.png; si no existe, muestra el nombre estilizado.
+/// Logo redondo de la tienda (assets/logo.png).
 class NayLogo extends StatelessWidget {
   final double size;
   const NayLogo({super.key, this.size = 120});
@@ -48,55 +52,147 @@ class NayLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipOval(
       child: Image.asset(
-      'assets/logo.png',
-      width: size,
-      height: size,
-      fit: BoxFit.contain,
-      errorBuilder: (_, _, _) => SizedBox(
-        width: size * 2,
+        'assets/logo.png',
+        width: size,
         height: size,
-        child: FittedBox(
-          child: RichText(
-            text: const TextSpan(
-              style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900, letterSpacing: 2),
-              children: [
-                TextSpan(text: 'Nay', style: TextStyle(color: NayColors.primary)),
-                TextSpan(text: 'Sport', style: TextStyle(color: NayColors.dark)),
-              ],
-            ),
-          ),
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => Container(
+          width: size,
+          height: size,
+          color: NayColors.logoBg,
+          alignment: Alignment.center,
+          child: Text('N', style: TextStyle(fontSize: size / 2, color: NayColors.primary)),
         ),
-      ),
       ),
     );
   }
 }
 
-/// Imagen de red con placeholder y fallback.
-class NetImage extends StatelessWidget {
-  final String url;
-  final IconData fallbackIcon;
-  const NetImage(this.url, {super.key, this.fallbackIcon = Icons.checkroom});
+/// Nombre de la tienda en letra cursiva.
+class BrandName extends StatelessWidget {
+  final double fontSize;
+  final Color color;
+  const BrandName({super.key, this.fontSize = 34, this.color = NayColors.primary});
 
   @override
-  Widget build(BuildContext context) {
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
-      loadingBuilder: (c, child, p) => p == null
-          ? child
-          : Container(
-              color: Colors.pink.shade50,
-              alignment: Alignment.center,
-              child: const CircularProgressIndicator(strokeWidth: 2),
-            ),
-      errorBuilder: (_, __, ___) => Container(
+  Widget build(BuildContext context) => Text(
+        'NaySport',
+        style: TextStyle(fontFamily: 'GreatVibes', fontSize: fontSize, color: color, height: 1.1),
+      );
+}
+
+/// Logo + nombre cursivo (para la barra superior).
+class BrandHeader extends StatelessWidget {
+  final double logoSize;
+  const BrandHeader({super.key, this.logoSize = 52});
+
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        NayLogo(size: logoSize),
+        const SizedBox(width: 12),
+        BrandName(fontSize: logoSize * 0.78),
+      ]);
+}
+
+/// Imagen de producto: acepta URL (http), archivo local o asset.
+class ProductImage extends StatelessWidget {
+  final String src;
+  final IconData fallbackIcon;
+  const ProductImage(this.src, {super.key, this.fallbackIcon = Icons.checkroom});
+
+  Widget _fallback() => Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(colors: [Colors.pink.shade100, Colors.purple.shade100]),
         ),
         alignment: Alignment.center,
-        child: Icon(fallbackIcon, size: 64, color: Colors.white),
+        child: Icon(fallbackIcon, size: 56, color: Colors.white),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    if (src.isEmpty) return _fallback();
+    if (src.startsWith('http')) {
+      return Image.network(
+        src,
+        fit: BoxFit.cover,
+        loadingBuilder: (c, child, p) => p == null
+            ? child
+            : Container(
+                color: Colors.pink.shade50,
+                alignment: Alignment.center,
+                child: const CircularProgressIndicator(strokeWidth: 2),
+              ),
+        errorBuilder: (_, _, _) => _fallback(),
+      );
+    }
+    if (src.startsWith('assets/')) {
+      return Image.asset(src, fit: BoxFit.cover, errorBuilder: (_, _, _) => _fallback());
+    }
+    return Image.file(File(src), fit: BoxFit.cover, errorBuilder: (_, _, _) => _fallback());
+  }
+
+  static ImageProvider? provider(String src) {
+    if (src.isEmpty) return null;
+    if (src.startsWith('http')) return NetworkImage(src);
+    if (src.startsWith('assets/')) return AssetImage(src);
+    return FileImage(File(src));
+  }
+}
+
+/// Precio en dólares con su equivalente en bolívares debajo.
+class PriceText extends StatelessWidget {
+  final double usdValue;
+  final double fontSize;
+  final Color? color;
+  final CrossAxisAlignment align;
+  const PriceText(this.usdValue,
+      {super.key, this.fontSize = 17, this.color, this.align = CrossAxisAlignment.start});
+
+  @override
+  Widget build(BuildContext context) {
+    final rate = AppScope.of(context).settings.exchangeRate;
+    return Column(crossAxisAlignment: align, mainAxisSize: MainAxisSize.min, children: [
+      Text(usd(usdValue), style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: color)),
+      Text(bs(usdValue, rate), style: TextStyle(fontSize: fontSize * 0.7, color: Colors.grey.shade600)),
+    ]);
+  }
+}
+
+/// Círculo de color.
+class ColorDot extends StatelessWidget {
+  final String colorName;
+  final double size;
+  final bool selected;
+  const ColorDot(this.colorName, {super.key, this.size = 28, this.selected = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Color(kColorPalette[colorName] ?? 0xFFCCCCCC);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: c,
+        gradient: colorName == 'Estampado'
+            ? const SweepGradient(colors: [Colors.pink, Colors.orange, Colors.purple, Colors.pink])
+            : null,
+        border: Border.all(
+          color: selected ? NayColors.primary : Colors.grey.shade400,
+          width: selected ? 3 : 1,
+        ),
+        boxShadow: selected ? [BoxShadow(color: NayColors.primary.withValues(alpha: 0.4), blurRadius: 6)] : null,
       ),
     );
   }
+}
+
+void showSnack(BuildContext context, String msg, {bool error = false}) {
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    content: Text(msg),
+    backgroundColor: error ? Colors.red.shade700 : null,
+    behavior: SnackBarBehavior.floating,
+    width: 420,
+  ));
 }

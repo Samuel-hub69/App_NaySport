@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../app_state.dart';
 import '../data.dart';
+import '../format.dart';
 import '../models.dart';
+import '../pdf_export.dart';
 import '../theme.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -23,11 +25,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _address = TextEditingController();
 
   PaymentMethod _method = PaymentMethod.paypal;
+  String _cashCurrency = 'Dólares en efectivo (\$)';
   final _cardNumber = TextEditingController();
   final _cardName = TextEditingController();
   final _cardExp = TextEditingController();
   final _cardCvv = TextEditingController();
   final _paypalEmail = TextEditingController();
+  final _pagoMovilPhone = TextEditingController();
+  final _pagoMovilBank = TextEditingController();
+  final _zelleAccount = TextEditingController();
+
+  @override
+  void dispose() {
+    _postal.dispose();
+    _city.dispose();
+    _address.dispose();
+    _cardNumber.dispose();
+    _cardName.dispose();
+    _cardExp.dispose();
+    _cardCvv.dispose();
+    _paypalEmail.dispose();
+    _pagoMovilPhone.dispose();
+    _pagoMovilBank.dispose();
+    _zelleAccount.dispose();
+    super.dispose();
+  }
+
+  String get _paymentDescription =>
+      _method == PaymentMethod.cash ? 'Efectivo ($_cashCurrency)' : _method.label;
 
   void _next() {
     if (_step == 0) {
@@ -40,7 +65,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _pay() async {
-    final state = AppScope.of(context);
+    final state = AppScope.read(context);
+    for (final item in state.items) {
+      if (state.qtyInCart(item.product.id) > item.product.stock) {
+        showSnack(context, 'Stock insuficiente para ${item.product.name}', error: true);
+        return;
+      }
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -48,28 +80,58 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         content: Row(children: [
           const CircularProgressIndicator(),
           const SizedBox(width: 20),
-          Text('Procesando pago con ${_method.label}...'),
+          Flexible(child: Text('Procesando pago con $_paymentDescription...')),
         ]),
       ),
     );
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
     Navigator.pop(context);
-    final total = state.total;
-    final order = 'NS-${DateTime.now().millisecondsSinceEpoch % 1000000}';
-    state.clearCart();
+
+    final order = await state.placeOrder(
+      country: _country!.name,
+      city: _city.text.trim(),
+      address: _address.text.trim(),
+      postalCode: _postal.text.trim(),
+      paymentMethod: _paymentDescription,
+    );
+    if (!mounted) return;
+
     await showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
         icon: const Icon(Icons.check_circle, color: Colors.green, size: 64),
         title: const Text('¡Compra realizada!'),
-        content: Text(
-          'Pedido $order\nTotal pagado: \$${total.toStringAsFixed(2)}\n'
-          'Envío a: ${_address.text}, ${_city.text}, ${_country!.name} (CP ${_postal.text})',
-          textAlign: TextAlign.center,
-        ),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('Pedido ${order.id}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 8),
+          Text('Total pagado: ${usd(order.total)} (${bs(order.total, order.exchangeRate)})'),
+          const SizedBox(height: 6),
+          Text(
+            'Envío a: ${order.address}, ${order.city}, ${order.country} (CP ${order.postalCode})',
+            textAlign: TextAlign.center,
+          ),
+        ]),
         actions: [
-          FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Volver a la tienda')),
+          TextButton.icon(
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text('Descargar recibo'),
+            onPressed: () async {
+              final bytes = await PdfExporter.buildReceiptPdf(order);
+              final path = await PdfExporter.savePdf(bytes, 'Recibo_${order.id}.pdf');
+              if (path != null && ctx.mounted) showSnack(ctx, 'Recibo guardado');
+            },
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.print),
+            label: const Text('Imprimir PDF'),
+            onPressed: () async {
+              final bytes = await PdfExporter.buildReceiptPdf(order);
+              await PdfExporter.openToPrint(bytes, 'Recibo_${order.id}.pdf');
+            },
+          ),
+          FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Volver a la tienda')),
         ],
       ),
     );
@@ -95,7 +157,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: Row(children: [
                 FilledButton(
                   onPressed: d.onStepContinue,
-                  child: Text(_step == 2 ? 'Pagar \$${state.total.toStringAsFixed(2)}' : 'Continuar'),
+                  child: Text(_step == 2 ? 'Pagar ${usd(state.total)}' : 'Continuar'),
                 ),
                 const SizedBox(width: 12),
                 if (_step > 0) TextButton(onPressed: d.onStepCancel, child: const Text('Atrás')),
@@ -112,7 +174,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 title: const Text('Método de pago'),
                 isActive: _step >= 1,
                 state: _step > 1 ? StepState.complete : StepState.indexed,
-                content: _paymentForm(),
+                content: _paymentForm(state),
               ),
               Step(
                 title: const Text('Confirmar'),
@@ -137,8 +199,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             initialValue: _country,
             decoration: const InputDecoration(labelText: 'País', prefixIcon: Icon(Icons.public)),
             items: [
-              for (final c in kCountries)
-                DropdownMenuItem(value: c, child: Text('${c.flag}  ${c.name}')),
+              for (final c in kCountries) DropdownMenuItem(value: c, child: Text('${c.flag}  ${c.name}')),
             ],
             onChanged: (c) => setState(() => _country = c),
             validator: (c) => c == null ? 'Selecciona tu país' : null,
@@ -173,7 +234,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           const SizedBox(height: 14),
           TextFormField(
             controller: _address,
-            decoration: const InputDecoration(labelText: 'Dirección (calle, número, referencia)', prefixIcon: Icon(Icons.home_outlined)),
+            decoration: const InputDecoration(
+                labelText: 'Dirección (calle, número, referencia)', prefixIcon: Icon(Icons.home_outlined)),
             validator: (v) => (v ?? '').trim().length < 5 ? 'Ingresa una dirección válida' : null,
           ),
         ]),
@@ -181,21 +243,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _paymentForm() {
+  Widget _paymentForm(AppState state) {
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 620),
+      constraints: const BoxConstraints(maxWidth: 640),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Wrap(spacing: 12, runSpacing: 12, children: [
           for (final m in PaymentMethod.values)
             _MethodTile(method: m, selected: _method == m, onTap: () => setState(() => _method = m)),
         ]),
         const SizedBox(height: 20),
-        Form(key: _payForm, child: _methodDetails()),
+        Form(key: _payForm, child: _methodDetails(state)),
       ]),
     );
   }
 
-  Widget _methodDetails() {
+  Widget _methodDetails(AppState state) {
+    final rate = state.settings.exchangeRate;
     switch (_method) {
       case PaymentMethod.card:
         return Column(children: [
@@ -237,14 +300,68 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       case PaymentMethod.paypal:
         return TextFormField(
           controller: _paypalEmail,
-          decoration: const InputDecoration(labelText: 'Correo de tu cuenta PayPal', prefixIcon: Icon(Icons.email_outlined)),
+          decoration:
+              const InputDecoration(labelText: 'Correo de tu cuenta PayPal', prefixIcon: Icon(Icons.email_outlined)),
           validator: (v) => RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$').hasMatch(v?.trim() ?? '') ? null : 'Correo no válido',
         );
+      case PaymentMethod.pagoMovil:
+        return Column(children: [
+          _InfoBox('Monto a transferir por Pago Móvil: ${bs(state.total, rate)} (tasa ${rate.toStringAsFixed(2)} Bs/\$).'),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              child: TextFormField(
+                controller: _pagoMovilPhone,
+                decoration: const InputDecoration(
+                    labelText: 'Tu teléfono (Pago Móvil)', prefixIcon: Icon(Icons.phone_android), hintText: '04141234567'),
+                validator: (v) => RegExp(r'^\d{10,13}$').hasMatch(v?.replaceAll(RegExp(r'\D'), '') ?? '')
+                    ? null
+                    : 'Ingresa un teléfono válido',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextFormField(
+                controller: _pagoMovilBank,
+                decoration: const InputDecoration(labelText: 'Banco emisor', prefixIcon: Icon(Icons.account_balance)),
+                validator: (v) => (v ?? '').trim().length < 3 ? 'Ingresa tu banco' : null,
+              ),
+            ),
+          ]),
+        ]);
+      case PaymentMethod.zelle:
+        return Column(children: [
+          _InfoBox('Total a enviar por Zelle: ${usd(state.total)}.'),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _zelleAccount,
+            decoration: const InputDecoration(
+                labelText: 'Correo o titular de tu cuenta Zelle', prefixIcon: Icon(Icons.flash_on)),
+            validator: (v) => (v ?? '').trim().length < 4 ? 'Ingresa los datos de tu Zelle' : null,
+          ),
+        ]);
       case PaymentMethod.transfer:
-        return const _InfoBox('Al confirmar recibirás los datos bancarios por correo. '
-            'Tu pedido se enviará cuando se acredite el pago (24-48 h).');
+        return _InfoBox(
+            'Al confirmar recibirás los datos bancarios. Monto: ${usd(state.total)} / ${bs(state.total, rate)}.');
       case PaymentMethod.cash:
-        return const _InfoBox('Pagarás en efectivo al recibir tu pedido. Se aplica un cargo adicional de \$0 en esta versión de prueba.');
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Elige en qué moneda física pagarás:', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 10, children: [
+            ChoiceChip(
+              label: Text('Dólares en efectivo (${usd(state.total)})'),
+              selected: _cashCurrency.startsWith('Dólares'),
+              onSelected: (_) => setState(() => _cashCurrency = 'Dólares en efectivo (\$)'),
+            ),
+            ChoiceChip(
+              label: Text('Bolívares en efectivo (${bs(state.total, rate)})'),
+              selected: _cashCurrency.startsWith('Bolívares'),
+              onSelected: (_) => setState(() => _cashCurrency = 'Bolívares en efectivo (Bs)'),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          const _InfoBox('Pagarás en efectivo al momento de recibir o retirar tu pedido.'),
+        ]);
       default:
         return _InfoBox('Serás redirigido a ${_method.label} para autorizar el pago de forma segura.');
     }
@@ -294,8 +411,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Row(children: [
               Icon(_method.icon, color: _method.color),
               const SizedBox(width: 8),
-              Text('Pago: ${_method.label}'),
+              Text('Pago: $_paymentDescription'),
             ]),
+            const SizedBox(height: 8),
+            Text('Total: ${usd(state.total)} (${bs(state.total, state.settings.exchangeRate)})',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: NayColors.primary)),
           ]),
         ),
       ),
@@ -303,31 +423,59 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _summary(AppState state) {
+    final rate = state.settings.exchangeRate;
     return Container(
-      width: 340,
+      width: 360,
       margin: const EdgeInsets.all(24),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Tu pedido', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-        for (final i in state.items)
+        for (final i in state.items) ...[
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(children: [
-              Expanded(child: Text('${i.quantity}× ${i.product.name}${i.size != null ? ' (${i.size})' : ''}')),
-              Text('\$${i.total.toStringAsFixed(2)}'),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                child: Text(
+                  '${i.quantity}× ${i.product.name}'
+                  '${[if (i.color != null) i.color!, if (i.size != null) i.size!].isNotEmpty ? ' (${[
+                        if (i.color != null) i.color!,
+                        if (i.size != null) i.size!
+                      ].join(', ')})' : ''}',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(usd(i.gross - state.discountAmountFor(i))),
             ]),
           ),
+        ],
         const Divider(height: 24),
-        Row(children: [const Text('Envío'), const Spacer(), Text(state.shipping == 0 ? 'GRATIS' : '\$${state.shipping.toStringAsFixed(2)}')]),
-        const SizedBox(height: 6),
+        Row(children: [const Text('Subtotal'), const Spacer(), Text(usd(state.subtotal))]),
+        if (state.discountTotal > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Row(children: [
+              const Text('Descuentos', style: TextStyle(color: Colors.green)),
+              const Spacer(),
+              Text('-${usd(state.discountTotal)}', style: const TextStyle(color: Colors.green)),
+            ]),
+          ),
+        const SizedBox(height: 4),
+        Row(children: [
+          const Text('Envío'),
+          const Spacer(),
+          Text(state.shipping == 0 ? 'GRATIS' : usd(state.shipping)),
+        ]),
+        const Divider(height: 20),
         Row(children: [
           const Text('Total', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
           const Spacer(),
-          Text('\$${state.total.toStringAsFixed(2)}',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: NayColors.primary)),
+          PriceText(state.total, fontSize: 17, color: NayColors.primary, align: CrossAxisAlignment.end),
         ]),
+        const SizedBox(height: 4),
+        Text('Tasa aplicada: ${rate.toStringAsFixed(2)} Bs/\$',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
       ]),
     );
   }
@@ -346,7 +494,7 @@ class _MethodTile extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 190,
+        width: 195,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: selected ? method.color.withValues(alpha: 0.08) : Colors.white,
@@ -354,9 +502,9 @@ class _MethodTile extends StatelessWidget {
           border: Border.all(color: selected ? method.color : Colors.grey.shade300, width: selected ? 2 : 1),
         ),
         child: Row(children: [
-          Icon(method.icon, color: method.color, size: 28),
+          Icon(method.icon, color: method.color, size: 26),
           const SizedBox(width: 10),
-          Expanded(child: Text(method.label, style: const TextStyle(fontWeight: FontWeight.w600))),
+          Expanded(child: Text(method.label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
         ]),
       ),
     );
