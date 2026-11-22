@@ -141,6 +141,8 @@ class _CashierPosViewState extends State<CashierPosView> {
 
   String get _paymentDetail {
     switch (_method) {
+      case PhysicalPaymentMethod.pos:
+        return 'Cobrado por punto de venta';
       case PhysicalPaymentMethod.pagoMovil:
         return 'Ref: ${_refCtrl.text.trim()}';
       case PhysicalPaymentMethod.zelle:
@@ -546,6 +548,9 @@ class _CashierPosViewState extends State<CashierPosView> {
 
   Widget _physicalPaymentField(double total, double rate) {
     switch (_method) {
+      case PhysicalPaymentMethod.pos:
+        return Text('Cobrar ${bs(total, rate)} por punto de venta en tienda.',
+            style: TextStyle(color: Colors.purple.shade800, fontWeight: FontWeight.w600));
       case PhysicalPaymentMethod.pagoMovil:
         return TextFormField(
           controller: _refCtrl,

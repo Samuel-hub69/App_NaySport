@@ -661,6 +661,7 @@ enum PaymentMethod {
 
 /// Métodos de pago exclusivos de TIENDA FÍSICA (Caja / Ventas).
 enum PhysicalPaymentMethod {
+  pos('Punto de Venta', 'Tarjeta débito / crédito en tienda (Bs)', Icons.point_of_sale, Color(0xFF6A1B9A)),
   pagoMovil('Pago Móvil', 'Transferencia inmediata en Bs', Icons.phone_android, Color(0xFF00897B)),
   zelle('Zelle', 'Transferencia en dólares (\$)', Icons.flash_on, Color(0xFF6D1ED4)),
   cashUsd('Efectivo Dólares (\$)', 'Pago en divisas en caja', Icons.attach_money, Color(0xFF2E7D32)),

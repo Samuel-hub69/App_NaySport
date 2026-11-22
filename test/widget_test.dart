@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:naysport/admin/admin_screen.dart';
 import 'package:naysport/app_state.dart';
 import 'package:naysport/db.dart';
 import 'package:naysport/format.dart';
@@ -40,7 +41,7 @@ void main() {
     expect(state.isAdmin, isFalse);
     expect(
       PhysicalPaymentMethod.values.map((m) => m.label).toList(),
-      ['Pago Móvil', 'Zelle', 'Efectivo Dólares (\$)', 'Efectivo Bolívares (Bs)'],
+      ['Punto de Venta', 'Pago Móvil', 'Zelle', 'Efectivo Dólares (\$)', 'Efectivo Bolívares (Bs)'],
     );
 
     // Venta en tienda física de 3 pares distintos -> aplica descuento 3+ (-5%) y descuenta stock por color
@@ -164,8 +165,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('Cliente de mostrador'), findsNothing);
-    expect(find.text('Punto de Venta'), findsNothing);
     expect(find.text('Transferencia bancaria'), findsNothing);
+    expect(find.text('Punto de Venta'), findsOneWidget);
 
     expect(find.text('Datos del cliente'), findsOneWidget);
     expect(find.text('Nombre completo y apellido'), findsOneWidget);
@@ -180,6 +181,12 @@ void main() {
     expect(find.text('Zelle'), findsOneWidget);
     expect(find.text('Efectivo Dólares (\$)'), findsOneWidget);
     expect(find.text('Efectivo Bolívares (Bs)'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Punto de Venta'));
+    await tester.tap(find.text('Punto de Venta'));
+    await tester.pump();
+    expect(find.textContaining('lote'), findsNothing);
+    expect(find.textContaining('por punto de venta en tienda'), findsOneWidget);
   });
 
   testWidgets('Categorías laterales se resaltan en rosado al pasar el mouse', (tester) async {
@@ -209,5 +216,51 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(find.byIcon(Icons.chevron_right), findsOneWidget);
+  });
+
+  testWidgets('Cierre del Día muestra los métodos de pago uno debajo del otro', (tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final state = AppState();
+    await tester.runAsync(() => state.load());
+    state.loginWithEmail(kDefaultAdminEmail, kDefaultAdminPassword);
+
+    final p1 = state.products.first;
+    await tester.runAsync(() async {
+      await state.placePhysicalSale(
+        saleItems: [CartItem(product: p1, color: p1.colors.firstOrNull, size: p1.sizes.firstOrNull, quantity: 1)],
+        customerName: 'Ana Pérez',
+        customerDocument: '20123456',
+        customerPhone: '+584141112233',
+        customerAddress: 'Centro',
+        paymentMethod: PhysicalPaymentMethod.pagoMovil.label,
+        paymentDetails: 'Ref: 1111',
+      );
+      await state.placePhysicalSale(
+        saleItems: [CartItem(product: p1, color: p1.colors.firstOrNull, size: p1.sizes.firstOrNull, quantity: 1)],
+        customerName: 'Luis Gómez',
+        customerDocument: '19123456',
+        customerPhone: '+584142223344',
+        customerAddress: 'Norte',
+        paymentMethod: PhysicalPaymentMethod.pos.label,
+        paymentDetails: 'Cobrado por punto de venta',
+      );
+    });
+
+    await tester.pumpWidget(
+      AppScope(
+        state: state,
+        child: const MaterialApp(home: AdminScreen()),
+      ),
+    );
+    await tester.pump();
+
+    final posPos = tester.getTopLeft(find.text('Punto de Venta').first);
+    final pmPos = tester.getTopLeft(find.text('Pago Móvil').first);
+    expect(pmPos.dx, equals(posPos.dx));
+    expect(pmPos.dy, greaterThan(posPos.dy));
   });
 }

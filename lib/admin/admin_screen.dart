@@ -217,14 +217,29 @@ class _DashboardTab extends StatelessWidget {
                   style: TextStyle(color: Colors.grey.shade700)),
             ]),
             if (todayByMethod.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(spacing: 10, runSpacing: 8, children: [
-                for (final e in todayByMethod.entries)
-                  Chip(
-                    backgroundColor: NayColors.bg,
-                    label: Text('${e.key}: ${usd(e.value)} (${bs(e.value, rate)})'),
-                  ),
-              ]),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: NayColors.bg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final e in todayByMethod.entries)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(children: [
+                          Expanded(child: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w600))),
+                          const SizedBox(width: 12),
+                          Text('${usd(e.value)} (${bs(e.value, rate)})',
+                              style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ]),
+                      ),
+                  ],
+                ),
+              ),
             ],
           ]),
         ),

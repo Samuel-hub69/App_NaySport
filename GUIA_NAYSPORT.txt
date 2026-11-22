@@ -49,8 +49,9 @@ Al iniciar sesión con una cuenta de Cajero:
   * Siempre se solicitan los datos del cliente (Nombre completo y apellido,
     Cédula de hasta 10 dígitos, Teléfono y Dirección) para mantener el registro
     de la compra.
-  * Métodos de pago físicos: Pago Móvil (con N° de referencia), Zelle,
-    Efectivo ($) y Efectivo (Bs). Muestra el total en $ y en Bs.
+  * Métodos de pago físicos: Punto de Venta (sin campos extra), Pago Móvil
+    (con N° de referencia), Zelle, Efectivo ($) y Efectivo (Bs). Muestra el
+    total en $ y en Bs.
   * Al darle a "Cobrar y registrar venta", descuenta el stock por color, registra
     la salida en el Kardex y permite imprimir el comprobante.
 - Pestaña [Mis ventas de hoy]:
