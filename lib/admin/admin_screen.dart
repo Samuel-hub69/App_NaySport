@@ -5,6 +5,9 @@ import '../db.dart';
 import '../format.dart';
 import '../models.dart';
 import '../pdf_export.dart';
+import '../screens/cashier_screen.dart';
+import '../screens/home_screen.dart';
+import '../screens/login_screen.dart';
 import '../theme.dart';
 import '../win_utils.dart';
 
@@ -29,17 +32,33 @@ class _AdminScreenState extends State<AdminScreen> {
           Text('Panel de Administración — NaySport', style: TextStyle(fontWeight: FontWeight.bold)),
         ]),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Chip(
-              avatar: const Icon(Icons.currency_exchange, size: 18, color: NayColors.primary),
-              backgroundColor: NayColors.logoBg,
-              label: Text(
-                '${state.settings.rateSource}: ${state.settings.exchangeRate.toStringAsFixed(2)} Bs/\$',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
+          Chip(
+            avatar: const Icon(Icons.currency_exchange, size: 18, color: NayColors.primary),
+            backgroundColor: NayColors.logoBg,
+            label: Text(
+              '${state.settings.rateSource}: ${state.settings.exchangeRate.toStringAsFixed(2)} Bs/\$',
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
+          const SizedBox(width: 10),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.storefront_outlined, size: 18),
+            label: const Text('Ver tienda'),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
+          ),
+          const SizedBox(width: 8),
+          TextButton.icon(
+            icon: const Icon(Icons.logout, size: 18),
+            label: const Text('Cerrar sesión'),
+            onPressed: () {
+              state.logout();
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen(isEntryGate: true)),
+                (_) => false,
+              );
+            },
+          ),
+          const SizedBox(width: 14),
         ],
       ),
       body: Row(children: [
@@ -50,6 +69,7 @@ class _AdminScreenState extends State<AdminScreen> {
           onDestinationSelected: (i) => setState(() => _tab = i),
           destinations: const [
             NavigationRailDestination(icon: Icon(Icons.dashboard_outlined), label: Text('Resumen')),
+            NavigationRailDestination(icon: Icon(Icons.point_of_sale), label: Text('Caja / Ventas')),
             NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), label: Text('Stock y Kardex')),
             NavigationRailDestination(icon: Icon(Icons.local_shipping_outlined), label: Text('Proveedores')),
             NavigationRailDestination(icon: Icon(Icons.category_outlined), label: Text('Categorías')),
@@ -62,6 +82,7 @@ class _AdminScreenState extends State<AdminScreen> {
         Expanded(
           child: IndexedStack(index: _tab, children: [
             _DashboardTab(onGoTab: (i) => setState(() => _tab = i)),
+            const CashierPosView(),
             const _InventoryTab(),
             const _SuppliersTab(),
             const _CategoriesTab(),
@@ -94,8 +115,18 @@ class _DashboardTab extends StatelessWidget {
     );
     final lowStock = state.products.where((p) => p.stock <= 5).toList()
       ..sort((a, b) => a.stock.compareTo(b.stock));
-    final clients = state.users.where((u) => !u.isAdmin).length;
+    final clients = state.users.where((u) => u.role == 'cliente').length;
     final pendingSuppliers = state.purchases.where((p) => !p.paid).length;
+    final today = DateTime.now();
+    final todayOrders = state.ordersForDay(today);
+    final todayUsd = todayOrders.fold(0.0, (s, o) => s + o.total);
+    final todayProfit = todayOrders.fold(0.0, (s, o) => s + o.estimatedProfit);
+    final todayPhysical = todayOrders.where((o) => o.isPhysical).fold(0.0, (s, o) => s + o.total);
+    final todayOnline = todayOrders.where((o) => !o.isPhysical).fold(0.0, (s, o) => s + o.total);
+    final todayByMethod = <String, double>{};
+    for (final o in todayOrders) {
+      todayByMethod[o.paymentMethod] = (todayByMethod[o.paymentMethod] ?? 0) + o.total;
+    }
 
     return ListView(padding: const EdgeInsets.all(24), children: [
       const Text('Resumen de la tienda', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
@@ -144,7 +175,61 @@ class _DashboardTab extends StatelessWidget {
           color: Colors.blue,
         ),
       ]),
-      const SizedBox(height: 28),
+      const SizedBox(height: 24),
+      Card(
+        elevation: 0,
+        color: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.point_of_sale, color: NayColors.primary),
+              const SizedBox(width: 8),
+              Text('Cierre del Día — ${fmtDay(today)}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.download, size: 18),
+                label: const Text('Cierre PDF'),
+                onPressed: () async {
+                  final bytes = await PdfExporter.buildDailyClosingPdf(todayOrders, today, rate);
+                  final path = await PdfExporter.savePdf(bytes, 'Cierre_Dia_NaySport.pdf');
+                  if (path != null && context.mounted) showSnack(context, 'Cierre guardado');
+                },
+              ),
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
+                icon: const Icon(Icons.print, size: 18),
+                label: const Text('Imprimir cierre'),
+                onPressed: () async {
+                  final bytes = await PdfExporter.buildDailyClosingPdf(todayOrders, today, rate);
+                  await PdfExporter.openToPrint(bytes, 'Cierre_Dia_NaySport.pdf');
+                },
+              ),
+            ]),
+            const Divider(height: 20),
+            Wrap(spacing: 28, runSpacing: 10, children: [
+              Text('Ventas hoy: ${todayOrders.length}   •   Total: ${usd(todayUsd)} (${bs(todayUsd, rate)})',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              Text('Ganancia hoy: ${usd(todayProfit)} (${bs(todayProfit, rate)})',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.teal.shade700)),
+              Text('Tienda física: ${usd(todayPhysical)}  |  Online: ${usd(todayOnline)}',
+                  style: TextStyle(color: Colors.grey.shade700)),
+            ]),
+            if (todayByMethod.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(spacing: 10, runSpacing: 8, children: [
+                for (final e in todayByMethod.entries)
+                  Chip(
+                    backgroundColor: NayColors.bg,
+                    label: Text('${e.key}: ${usd(e.value)} (${bs(e.value, rate)})'),
+                  ),
+              ]),
+            ],
+          ]),
+        ),
+      ),
+      const SizedBox(height: 24),
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Expanded(
           child: Card(
@@ -158,7 +243,7 @@ class _DashboardTab extends StatelessWidget {
                   const SizedBox(width: 8),
                   const Text('Alertas de inventario', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                   const Spacer(),
-                  TextButton(onPressed: () => onGoTab(1), child: const Text('Ir a Stock')),
+                  TextButton(onPressed: () => onGoTab(2), child: const Text('Ir a Stock')),
                 ]),
                 const Divider(),
                 if (lowStock.isEmpty)
@@ -209,7 +294,7 @@ class _DashboardTab extends StatelessWidget {
                   const SizedBox(width: 8),
                   const Text('Últimas ventas', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                   const Spacer(),
-                  TextButton(onPressed: () => onGoTab(5), child: const Text('Ver historial')),
+                  TextButton(onPressed: () => onGoTab(6), child: const Text('Ver historial')),
                 ]),
                 const Divider(),
                 if (state.orders.isEmpty)
@@ -436,10 +521,10 @@ class _InventoryTabState extends State<_InventoryTab> {
                   if (p.colors.isNotEmpty || p.sizes.isNotEmpty)
                     Text(
                       [
-                        if (p.colors.isNotEmpty) 'Colores: ${p.colors.join(', ')}',
+                        if (p.colors.isNotEmpty) p.colorStockSummary,
                         if (p.sizes.isNotEmpty) 'Tallas: ${p.sizes.join(', ')}',
-                      ].join(' • '),
-                      maxLines: 1,
+                      ].join('  •  '),
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
@@ -447,23 +532,28 @@ class _InventoryTabState extends State<_InventoryTab> {
               ),
               SizedBox(width: 140, child: PriceText(p.price, fontSize: 15)),
               Row(children: [
-                IconButton(
-                  icon: const Icon(Icons.remove_circle_outline),
-                  onPressed: p.stock > 0 ? () => state.adjustStock(p, p.stock - 1) : null,
-                ),
-                InkWell(
-                  onTap: () => _editStockQuick(context, p),
-                  child: Chip(
-                    backgroundColor: p.stock == 0
-                        ? Colors.red.shade100
-                        : (p.stock <= 5 ? Colors.orange.shade100 : Colors.green.shade100),
-                    label: Text('${p.stock} unid.', style: const TextStyle(fontWeight: FontWeight.bold)),
+                if (p.colors.isEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: p.stock > 0 ? () => state.adjustStock(p, p.stock - 1) : null,
+                  ),
+                Tooltip(
+                  message: p.colors.isNotEmpty ? 'Clic para editar stock por color' : 'Clic para editar stock',
+                  child: InkWell(
+                    onTap: () => _editStockQuick(context, p),
+                    child: Chip(
+                      backgroundColor: p.stock == 0
+                          ? Colors.red.shade100
+                          : (p.stock <= 5 ? Colors.orange.shade100 : Colors.green.shade100),
+                      label: Text('${p.stock} unid.', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline),
-                  onPressed: () => state.adjustStock(p, p.stock + 1),
-                ),
+                if (p.colors.isEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: () => state.adjustStock(p, p.stock + 1),
+                  ),
               ]),
               const SizedBox(width: 8),
               Tooltip(
@@ -536,25 +626,70 @@ class _InventoryTabState extends State<_InventoryTab> {
 
   Future<void> _editStockQuick(BuildContext context, Product p) async {
     final state = AppScope.read(context);
-    final ctrl = TextEditingController(text: '${p.stock}');
-    final res = await showDialog<int>(
+    if (p.colors.isEmpty) {
+      final ctrl = TextEditingController(text: '${p.stock}');
+      final res = await showDialog<int>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Stock de ${p.name}'),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(labelText: 'Cantidad disponible'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, int.tryParse(ctrl.text)), child: const Text('Guardar')),
+          ],
+        ),
+      );
+      if (res != null) await state.adjustStock(p, res, reason: 'Edición directa de stock');
+      return;
+    }
+
+    final ctrls = {for (final c in p.colors) c: TextEditingController(text: '${p.stockForColor(c)}')};
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Stock de ${p.name}'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: const InputDecoration(labelText: 'Cantidad disponible'),
+        title: Text('Stock por color — ${p.name}'),
+        content: SizedBox(
+          width: 380,
+          child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              for (final c in p.colors) ...[
+                TextField(
+                  controller: ctrls[c],
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'Cantidad en $c',
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: ColorDot(c, size: 18),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+            ]),
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, int.tryParse(ctrl.text)), child: const Text('Guardar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Guardar')),
         ],
       ),
     );
-    if (res != null) await state.adjustStock(p, res, reason: 'Edición directa de stock');
+    if (ok == true) {
+      for (final c in p.colors) {
+        final v = int.tryParse(ctrls[c]!.text);
+        if (v != null) {
+          await state.adjustColorStock(p, c, v, reason: 'Edición directa de stock');
+        }
+      }
+    }
   }
 
   Future<void> _openBulkPriceDialog(BuildContext context) async {
@@ -626,7 +761,9 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
   late final TextEditingController _image;
   late String _catId;
   late List<String> _colors;
+  late Map<String, TextEditingController> _colorCtrls;
   late bool _active;
+  bool _costTouched = false;
 
   @override
   void initState() {
@@ -642,7 +779,11 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
     _image = TextEditingController(text: p?.image ?? '');
     _catId = p?.categoryId ?? (state.categories.isNotEmpty ? state.categories.first.id : 'casual');
     _colors = List<String>.from(p?.colors ?? []);
+    _colorCtrls = {
+      for (final c in _colors) c: TextEditingController(text: '${p?.stockForColor(c) ?? 5}'),
+    };
     _active = p?.active ?? true;
+    _costTouched = p != null && p.costPrice > 0;
   }
 
   @override
@@ -654,6 +795,9 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
     _stock.dispose();
     _sizes.dispose();
     _image.dispose();
+    for (final c in _colorCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -719,7 +863,12 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
     if (ok == true && nameCtrl.text.trim().isNotEmpty && mounted) {
       final name = nameCtrl.text.trim();
       await AppScope.read(context).addCustomColor(name, pickedHex);
-      if (mounted && !_colors.contains(name)) setState(() => _colors.add(name));
+      if (mounted && !_colors.contains(name)) {
+        setState(() {
+          _colors.add(name);
+          _colorCtrls[name] = TextEditingController(text: '5');
+        });
+      }
     }
   }
 
@@ -788,10 +937,11 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
                   child: TextFormField(
                     controller: _cost,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (_) => _costTouched = true,
                     decoration: const InputDecoration(
-                      labelText: 'Costo compra (USD, opcional)',
+                      labelText: 'Costo compra (USD)',
                       prefixText: '\$ ',
-                      helperText: 'Solo lo ve el admin',
+                      helperText: 'Sugerido: Venta - \$5 (solo admin)',
                     ),
                   ),
                 ),
@@ -805,23 +955,31 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
                       prefixText: '\$ ',
                       helperText: 'Equivalente: ${bs(parsedPrice, rate)}',
                     ),
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (v) {
+                      final d = double.tryParse(v.replaceAll(',', '.'));
+                      if (!_costTouched && d != null && d > 5) {
+                        _cost.text = (d - 5).toStringAsFixed(2);
+                      }
+                      setState(() {});
+                    },
                     validator: (v) {
                       final d = double.tryParse((v ?? '').replaceAll(',', '.'));
                       return (d == null || d <= 0) ? 'Precio inválido' : null;
                     },
                   ),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: TextFormField(
-                    controller: _stock,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(labelText: 'Stock (unidades)'),
-                    validator: (v) => int.tryParse(v ?? '') == null ? 'Número inválido' : null,
+                if (_colors.isEmpty) ...[
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _stock,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(labelText: 'Stock (unidades)'),
+                      validator: (v) => int.tryParse(v ?? '') == null ? 'Número inválido' : null,
+                    ),
                   ),
-                ),
+                ],
               ]),
               const SizedBox(height: 14),
               TextFormField(
@@ -866,12 +1024,35 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
                     onSelected: (sel) => setState(() {
                       if (sel) {
                         _colors.add(c);
+                        _colorCtrls.putIfAbsent(c, () => TextEditingController(text: '5'));
                       } else {
                         _colors.remove(c);
                       }
                     }),
                   ),
               ]),
+              if (_colors.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                const Text('Stock disponible por cada color:', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Wrap(spacing: 10, runSpacing: 10, children: [
+                  for (final c in _colors)
+                    SizedBox(
+                      width: 155,
+                      child: TextFormField(
+                        controller: _colorCtrls[c],
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: InputDecoration(
+                          isDense: true,
+                          labelText: c,
+                          prefixIcon: Padding(padding: const EdgeInsets.all(10), child: ColorDot(c, size: 14)),
+                        ),
+                        validator: (v) => int.tryParse(v ?? '') == null ? 'Inválido' : null,
+                      ),
+                    ),
+                ]),
+              ],
               const SizedBox(height: 10),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
@@ -890,8 +1071,12 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
             if (!_form.currentState!.validate()) return;
             final sizes = _sizes.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
             final price = double.parse(_price.text.replaceAll(',', '.'));
-            final cost = double.tryParse(_cost.text.replaceAll(',', '.')) ?? 0;
-            final stock = int.parse(_stock.text);
+            final cost = double.tryParse(_cost.text.replaceAll(',', '.')) ??
+                (price > 5 ? double.parse((price - 5).toStringAsFixed(2)) : 0);
+            final newColorStock = <String, int>{
+              for (final c in _colors) c: int.tryParse(_colorCtrls[c]?.text ?? '0') ?? 0,
+            };
+            final stock = _colors.isEmpty ? int.parse(_stock.text) : newColorStock.values.fold(0, (s, v) => s + v);
 
             if (widget.product == null) {
               final prod = Product(
@@ -904,17 +1089,25 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
                 image: _image.text.trim(),
                 sizes: sizes,
                 colors: _colors,
+                colorStock: {for (final c in _colors) c: 0},
                 stock: 0,
                 active: _active,
               );
               state.products.insert(0, prod);
-              if (stock > 0) {
+              if (_colors.isNotEmpty) {
+                for (final c in _colors) {
+                  if ((newColorStock[c] ?? 0) > 0) {
+                    await state.adjustColorStock(prod, c, newColorStock[c]!, reason: 'Stock inicial de producto nuevo');
+                  }
+                }
+              } else if (stock > 0) {
                 await state.adjustStock(prod, stock, reason: 'Stock inicial de producto nuevo');
-              } else {
-                await state.commit();
               }
+              await state.commit();
             } else {
               final p = widget.product!;
+              final oldMap = Map<String, int>.from(p.colorStock);
+              final hadColors = p.colors.isNotEmpty;
               p.name = _name.text.trim();
               p.description = _desc.text.trim();
               p.price = price;
@@ -922,12 +1115,19 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
               p.categoryId = _catId;
               p.image = _image.text.trim();
               p.sizes = sizes;
-              p.colors = _colors;
               p.active = _active;
-              if (p.stock != stock) {
-                await state.adjustStock(p, stock, reason: 'Editado desde ficha de producto');
+              if (_colors.isNotEmpty) {
+                p.syncColors(_colors, oldMap);
+                for (final c in _colors) {
+                  await state.adjustColorStock(p, c, newColorStock[c] ?? 0, reason: 'Editado desde ficha');
+                }
               } else {
-                await state.commit();
+                p.syncColors([], {});
+                if (hadColors || p.stock != stock) {
+                  await state.adjustStock(p, stock, reason: 'Editado desde ficha de producto');
+                } else {
+                  await state.commit();
+                }
               }
             }
             if (context.mounted) Navigator.pop(context);
@@ -1254,6 +1454,7 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
     final state = AppScope.read(context);
     if (state.products.isEmpty) return;
     Product selected = state.products.first;
+    String? selectedColor = selected.colors.isNotEmpty ? selected.colors.first : null;
     final qtyCtrl = TextEditingController(text: '10');
     final costCtrl = TextEditingController(text: selected.costPrice > 0 ? selected.costPrice.toStringAsFixed(2) : '15.00');
     final noteCtrl = TextEditingController();
@@ -1264,7 +1465,7 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
         builder: (ctx, setLocal) => AlertDialog(
           title: const Text('Agregar prenda recibida'),
           content: SizedBox(
-            width: 400,
+            width: 420,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               DropdownButtonFormField<Product>(
                 initialValue: selected,
@@ -1274,10 +1475,26 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
                   if (p == null) return;
                   setLocal(() {
                     selected = p;
+                    selectedColor = p.colors.isNotEmpty ? p.colors.first : null;
                     if (p.costPrice > 0) costCtrl.text = p.costPrice.toStringAsFixed(2);
                   });
                 },
               ),
+              if (selected.colors.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedColor,
+                  decoration: const InputDecoration(labelText: 'Color que llegó'),
+                  items: [
+                    for (final c in selected.colors)
+                      DropdownMenuItem(
+                        value: c,
+                        child: Row(children: [ColorDot(c, size: 14), const SizedBox(width: 8), Text(c)]),
+                      ),
+                  ],
+                  onChanged: (c) => setLocal(() => selectedColor = c),
+                ),
+              ],
               const SizedBox(height: 12),
               Row(children: [
                 Expanded(
@@ -1300,7 +1517,7 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
               const SizedBox(height: 12),
               TextField(
                 controller: noteCtrl,
-                decoration: const InputDecoration(labelText: 'Colores / Tallas recibidas (opcional)'),
+                decoration: const InputDecoration(labelText: 'Tallas / Detalles (opcional)'),
               ),
             ]),
           ),
@@ -1318,6 +1535,7 @@ class _PurchaseDialogState extends State<_PurchaseDialog> {
       setState(() => _lines.add(PurchaseLine(
             productId: selected.id,
             productName: selected.name,
+            color: selectedColor,
             qty: qty,
             unitCost: cost,
             note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
@@ -1601,7 +1819,8 @@ class _CustomersTabState extends State<_CustomersTab> {
                   const SizedBox(width: 8),
                   Chip(
                     visualDensity: VisualDensity.compact,
-                    label: Text(u.isAdmin ? 'Admin' : 'Cliente', style: const TextStyle(fontSize: 11)),
+                    label: Text(u.isAdmin ? 'Admin' : (u.isCashier ? 'Cajero' : 'Cliente'),
+                      style: const TextStyle(fontSize: 11)),
                   ),
                 ]),
                 subtitle: Text(
@@ -1800,8 +2019,17 @@ class _OrdersTabState extends State<_OrdersTab> {
                     elevation: 0,
                     color: Colors.white,
                     child: ExpansionTile(
-                      title: Text('${o.id} — ${o.customerName}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text('${fmtDate(o.date)} • ${o.paymentMethod} • ${o.units} unid.'),
+                      title: Row(children: [
+                        Text('${o.id} — ${o.customerName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 8),
+                        Chip(
+                          visualDensity: VisualDensity.compact,
+                          backgroundColor: o.isPhysical ? Colors.teal.shade50 : Colors.pink.shade50,
+                          label: Text(o.channel, style: const TextStyle(fontSize: 11)),
+                        ),
+                      ]),
+                      subtitle: Text(
+                          '${fmtDate(o.date)} • ${o.paymentMethod} • ${o.units} unid.${o.isPhysical && o.cashierName.isNotEmpty ? ' • Atendió: ${o.cashierName}' : ''}'),
                       trailing: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -1817,11 +2045,19 @@ class _OrdersTabState extends State<_OrdersTab> {
                         const Divider(),
                         Align(
                           alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Correo: ${o.customerEmail}${o.customerPhone.isNotEmpty ? ' • Tel: ${o.customerPhone}' : ''}\n'
-                            'Envío: ${o.address}, ${o.city}, ${o.country} (CP ${o.postalCode})'
-                            '${o.paymentDetails.isNotEmpty ? '\nDetalle de pago: ${o.paymentDetails}' : ''}',
-                          ),
+                          child: Text([
+                            if ([o.customerEmail, o.customerDocument, o.customerPhone].any((s) => s.isNotEmpty))
+                              [
+                                if (o.customerEmail.isNotEmpty) 'Correo: ${o.customerEmail}',
+                                if (o.customerDocument.isNotEmpty) 'Cédula: ${o.customerDocument}',
+                                if (o.customerPhone.isNotEmpty) 'Tel: ${o.customerPhone}',
+                              ].join(' • '),
+                            o.isPhysical
+                                ? 'Canal: Tienda física (Atendió: ${o.cashierName})'
+                                : 'Envío: ${o.address}, ${o.city}, ${o.country} (CP ${o.postalCode})',
+                            if (o.paymentDetails.isNotEmpty) 'Detalle de pago: ${o.paymentDetails}',
+                            'Ganancia estimada en esta venta: ${usd(o.estimatedProfit)}',
+                          ].join('\n')),
                         ),
                         const SizedBox(height: 8),
                         for (final l in o.lines)
@@ -2055,6 +2291,61 @@ class _SettingsTabState extends State<_SettingsTab> {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Text('Personal de Caja (Cajeros)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              FilledButton.tonalIcon(
+                icon: const Icon(Icons.person_add),
+                label: const Text('Nuevo cajero'),
+                onPressed: () => _createCashierDialog(context),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            Text(
+              'Los cajeros solo pueden cobrar en Caja / Ventas y ver sus ventas del día (no ven ganancias ni pueden borrar nada).',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+            ),
+            const SizedBox(height: 10),
+            for (final u in state.users.where((u) => u.isCashier))
+              ListTile(
+                dense: true,
+                leading: CircleAvatar(
+                  backgroundColor: u.active ? Colors.teal.shade100 : Colors.grey.shade300,
+                  child: Icon(Icons.badge, color: u.active ? Colors.teal : Colors.black54),
+                ),
+                title: Text(u.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('${u.email}${u.phone.isNotEmpty ? ' • ${u.phone}' : ''}'),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Switch(
+                    value: u.active,
+                    onChanged: (v) {
+                      u.active = v;
+                      state.commit();
+                    },
+                  ),
+                  IconButton(
+                    tooltip: 'Eliminar cajero',
+                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                    onPressed: () async {
+                      final ok = await _confirmDialog(context, '¿Eliminar cajero "${u.name}"?', '');
+                      if (ok) {
+                        state.users.remove(u);
+                        await state.commit();
+                      }
+                    },
+                  ),
+                ]),
+              ),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 16),
+      Card(
+        elevation: 0,
+        color: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Seguridad y Base de Datos local', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             SelectableText('Archivo de base de datos: ${LocalDb.file.path}',
@@ -2156,6 +2447,74 @@ class _SettingsTabState extends State<_SettingsTab> {
       }
       await AppScope.read(context).changeAdminPassword(p1.text);
       if (context.mounted) showSnack(context, 'Contraseña actualizada');
+    }
+  }
+
+  Future<void> _createCashierDialog(BuildContext context) async {
+    final form = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final passCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Crear cuenta de Cajero'),
+        content: SizedBox(
+          width: 400,
+          child: Form(
+            key: form,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextFormField(
+                controller: nameCtrl,
+                inputFormatters: [nameInputFormatter],
+                decoration: const InputDecoration(labelText: 'Nombre completo'),
+                validator: validateFullName,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: emailCtrl,
+                decoration: const InputDecoration(labelText: 'Correo para iniciar sesión'),
+                validator: (v) => RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$').hasMatch(v?.trim() ?? '') ? null : 'Correo no válido',
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: phoneCtrl,
+                inputFormatters: const [PlusDigitsPhoneFormatter()],
+                decoration: const InputDecoration(labelText: 'Teléfono (opcional)'),
+                validator: (v) => (v ?? '').trim().isEmpty ? null : validatePhone(v),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: passCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Contraseña (mín. 8 caracteres)'),
+                validator: (v) => (v ?? '').length < 8 ? 'Mínimo 8 caracteres' : null,
+              ),
+            ]),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) Navigator.pop(ctx, true);
+            },
+            child: const Text('Crear cajero'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      final err = await AppScope.read(context).register(
+        name: nameCtrl.text.trim(),
+        email: emailCtrl.text.trim(),
+        phone: phoneCtrl.text.trim(),
+        password: passCtrl.text,
+        role: 'cajero',
+      );
+      if (!context.mounted) return;
+      showSnack(context, err ?? 'Cajero creado correctamente', error: err != null);
     }
   }
 }

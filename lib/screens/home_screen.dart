@@ -5,6 +5,7 @@ import '../format.dart';
 import '../models.dart';
 import '../theme.dart';
 import 'cart_screen.dart';
+import 'cashier_screen.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -65,6 +66,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           label: const Text('Panel admin'),
                           onPressed: () => Navigator.push(
                               context, MaterialPageRoute(builder: (_) => const AdminScreen())),
+                        ),
+                      )
+                    else if (state.isCashier)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilledButton.tonalIcon(
+                          icon: const Icon(Icons.point_of_sale, size: 18),
+                          label: const Text('Ir a Caja'),
+                          onPressed: () => Navigator.pushReplacement(
+                              context, MaterialPageRoute(builder: (_) => const CashierScreen())),
                         ),
                       ),
                     if (state.isLoggedIn) Flexible(child: _AccountMenu(state: state)) else
@@ -405,14 +416,23 @@ class _ProductDialogState extends State<ProductDialog> {
     });
   }
 
+  int _availForColor(AppState state, String? c) {
+    final p = widget.product;
+    if (p.colors.isNotEmpty && c == null) return state.availableFor(p);
+    final inBundle = _bundle.where((e) => e.color == c).fold(0, (s, e) => s + e.qty);
+    return (state.availableFor(p, color: c) - inBundle).clamp(0, 1 << 30);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final p = widget.product;
-    final available = state.availableFor(p);
+    final availableTotal = state.availableFor(p);
     final bundleQty = _bundle.fold(0, (s, e) => s + e.qty);
-    final remaining = (available - bundleQty).clamp(0, available);
-    final safeQty = remaining == 0 ? 0 : _qty.clamp(1, remaining);
+    final colorRemaining = (p.colors.isNotEmpty && _color != null)
+        ? _availForColor(state, _color)
+        : (availableTotal - bundleQty).clamp(0, availableTotal);
+    final safeQty = colorRemaining == 0 ? 0 : _qty.clamp(1, colorRemaining);
     final hasCurrentReady = _missing == null && safeQty > 0;
     final totalSelected = bundleQty + ((_bundle.isEmpty || hasCurrentReady) ? safeQty : 0);
 
@@ -451,8 +471,16 @@ class _ProductDialogState extends State<ProductDialog> {
                   Text(p.description, style: TextStyle(color: Colors.grey.shade700)),
                   const SizedBox(height: 6),
                   Text(
-                    available > 0 ? 'Disponibles: $available' : 'Sin stock disponible',
-                    style: TextStyle(color: available > 0 ? Colors.green.shade700 : Colors.red, fontSize: 13),
+                    (p.colors.isNotEmpty && _color != null)
+                        ? (colorRemaining > 0 ? 'Disponibles en $_color: $colorRemaining' : 'Agotado en $_color')
+                        : (availableTotal > 0 ? 'Disponibles en total: $availableTotal' : 'Sin stock disponible'),
+                    style: TextStyle(
+                      color: (p.colors.isNotEmpty && _color != null ? colorRemaining : availableTotal) > 0
+                          ? Colors.green.shade700
+                          : Colors.red,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   if (p.colors.isNotEmpty) ...[
                     const SizedBox(height: 18),
@@ -464,12 +492,15 @@ class _ProductDialogState extends State<ProductDialog> {
                     const SizedBox(height: 8),
                     Wrap(spacing: 8, runSpacing: 8, children: [
                       for (final c in p.colors)
-                        ChoiceChip(
-                          avatar: ColorDot(c, size: 18),
-                          label: Text(c),
-                          selected: _color == c,
-                          onSelected: (_) => setState(() => _color = c),
-                        ),
+                        Builder(builder: (_) {
+                          final cAvail = _availForColor(state, c);
+                          return ChoiceChip(
+                            avatar: ColorDot(c, size: 18),
+                            label: Text(cAvail > 0 ? '$c ($cAvail)' : '$c (Agotado)'),
+                            selected: _color == c,
+                            onSelected: cAvail <= 0 ? null : (_) => setState(() => _color = c),
+                          );
+                        }),
                     ]),
                   ],
                   if (p.sizes.isNotEmpty) ...[
@@ -503,15 +534,15 @@ class _ProductDialogState extends State<ProductDialog> {
                     ),
                     IconButton.outlined(
                       icon: const Icon(Icons.add),
-                      onPressed: safeQty < remaining ? () => setState(() => _qty = safeQty + 1) : null,
+                      onPressed: safeQty < colorRemaining ? () => setState(() => _qty = safeQty + 1) : null,
                     ),
-                    if (canCombine && remaining > 0) ...[
+                    if (canCombine && colorRemaining > 0) ...[
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton.icon(
                           icon: const Icon(Icons.add_circle_outline, size: 18),
                           label: const Text('Añadir y elegir otro color/talla'),
-                          onPressed: () => _addVariantAndChooseAnother(remaining),
+                          onPressed: () => _addVariantAndChooseAnother(colorRemaining),
                         ),
                       ),
                     ],
@@ -569,12 +600,12 @@ class _ProductDialogState extends State<ProductDialog> {
                     width: double.infinity,
                     child: FilledButton.icon(
                       icon: const Icon(Icons.shopping_bag),
-                      label: Text(available <= 0
+                      label: Text(availableTotal <= 0
                           ? 'Sin stock disponible'
                           : (_bundle.isEmpty
                               ? 'Agregar $safeQty al carrito'
                               : 'Agregar $totalSelected al carrito')),
-                      onPressed: available <= 0
+                      onPressed: availableTotal <= 0
                           ? null
                           : () {
                               if (_bundle.isEmpty && _missing != null) {

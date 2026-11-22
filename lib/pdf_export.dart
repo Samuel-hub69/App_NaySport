@@ -105,14 +105,16 @@ class PdfExporter {
             cellStyle: const pw.TextStyle(fontSize: 8.2),
             cellPadding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
             oddRowDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFFF9FC)),
-            headers: ['Pedido', 'Fecha', 'Cliente', 'Destino', 'Productos', 'Pago', 'Total USD', 'Total Bs'],
+            headers: ['N°', 'Fecha / Canal', 'Cliente', 'Productos', 'Pago', 'Total USD', 'Total Bs'],
             data: [
               for (final o in orders)
                 [
                   o.id,
-                  fmtDate(o.date),
-                  '${o.customerName}\n${o.customerEmail}${o.customerPhone.isNotEmpty ? '\n${o.customerPhone}' : ''}',
-                  '${o.city}, ${o.country}\nCP ${o.postalCode}',
+                  '${fmtDate(o.date)}\n${o.channel}${o.cashierName.isNotEmpty && o.isPhysical ? ' (${o.cashierName})' : ''}',
+                  '${o.customerName}'
+                  '${o.customerDocument.isNotEmpty ? '\nCI: ${o.customerDocument}' : ''}'
+                  '${o.customerEmail.isNotEmpty ? '\n${o.customerEmail}' : ''}'
+                  '${o.customerPhone.isNotEmpty ? '\n${o.customerPhone}' : ''}',
                   o.lines
                       .map((l) => '${l.qty}x ${l.productName}${l.variant.isNotEmpty ? ' (${l.variant})' : ''}')
                       .join('\n'),
@@ -167,13 +169,13 @@ class PdfExporter {
           headerDecoration: const pw.BoxDecoration(color: _pdfPink),
           cellStyle: const pw.TextStyle(fontSize: 8.5),
           cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-          headers: ['Producto', 'Categoría', 'Colores', 'Tallas', 'Costo \$', 'Venta \$', 'Venta Bs', 'Stock', 'Estado'],
+          headers: ['Producto', 'Categoría', 'Stock por color', 'Tallas', 'Costo \$', 'Venta \$', 'Venta Bs', 'Total', 'Estado'],
           data: [
             for (final p in state.products)
               [
                 p.name,
                 state.categoryName(p.categoryId),
-                p.colors.isEmpty ? '-' : p.colors.join(', '),
+                p.colors.isEmpty ? 'General' : p.colorStockSummary,
                 p.sizes.isEmpty ? '-' : p.sizes.join(', '),
                 p.costPrice > 0 ? usd(p.costPrice) : '-',
                 usd(p.price),
@@ -254,11 +256,13 @@ class PdfExporter {
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(28),
       build: (_) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-        _header(logo, 'Comprobante de Pedido ${o.id}', fmtDate(o.date)),
+        _header(logo, 'Comprobante ${o.id} (${o.channel})', fmtDate(o.date)),
         pw.SizedBox(height: 16),
-        pw.Text('Cliente: ${o.customerName} (${o.customerEmail})'),
+        pw.Text('Cliente: ${o.customerName}${o.customerEmail.isNotEmpty ? ' (${o.customerEmail})' : ''}'),
+        if (o.customerDocument.isNotEmpty) pw.Text('Cédula: ${o.customerDocument}'),
         if (o.customerPhone.isNotEmpty) pw.Text('Teléfono: ${o.customerPhone}'),
-        pw.Text('Dirección: ${o.address}, ${o.city}, ${o.country} - CP ${o.postalCode}'),
+        if (!o.isPhysical) pw.Text('Dirección: ${o.address}, ${o.city}, ${o.country} - CP ${o.postalCode}'),
+        if (o.cashierName.isNotEmpty && o.isPhysical) pw.Text('Atendido por: ${o.cashierName}'),
         pw.Text('Método de pago: ${o.paymentMethod}${o.paymentDetails.isNotEmpty ? ' (${o.paymentDetails})' : ''}'),
         pw.SizedBox(height: 16),
         pw.TableHelper.fromTextArray(
@@ -293,6 +297,93 @@ class PdfExporter {
           ]),
         ),
       ]),
+    ));
+    return doc.save();
+  }
+
+  /// Genera el PDF de Cierre del Día (solo Admin).
+  static Future<Uint8List> buildDailyClosingPdf(List<Order> dayOrders, DateTime day, double currentRate) async {
+    final doc = await _createDoc();
+    final logo = await _loadLogo();
+    final totalUsd = dayOrders.fold(0.0, (s, o) => s + o.total);
+    final totalProfit = dayOrders.fold(0.0, (s, o) => s + o.estimatedProfit);
+    final physicalUsd = dayOrders.where((o) => o.isPhysical).fold(0.0, (s, o) => s + o.total);
+    final onlineUsd = dayOrders.where((o) => !o.isPhysical).fold(0.0, (s, o) => s + o.total);
+
+    final byMethod = <String, ({int count, double usdTotal})>{};
+    for (final o in dayOrders) {
+      final prev = byMethod[o.paymentMethod] ?? (count: 0, usdTotal: 0.0);
+      byMethod[o.paymentMethod] = (count: prev.count + 1, usdTotal: prev.usdTotal + o.total);
+    }
+
+    doc.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(26),
+      header: (_) => _header(logo, 'Cierre del Día — ${fmtDay(day)}', 'Tasa: ${currentRate.toStringAsFixed(2)} Bs/\$'),
+      footer: (ctx) => pw.Align(
+        alignment: pw.Alignment.centerRight,
+        child: pw.Text('Página ${ctx.pageNumber} de ${ctx.pagesCount}',
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+      ),
+      build: (_) => [
+        pw.SizedBox(height: 12),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(10),
+          decoration: const pw.BoxDecoration(
+            color: _pdfLightPink,
+            borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
+          ),
+          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceAround, children: [
+            _kpi('Ventas del día', '${dayOrders.length}'),
+            _kpi('Total USD', usd(totalUsd)),
+            _kpi('Total Bs', bs(totalUsd, currentRate)),
+            _kpi('Ganancia estimada', usd(totalProfit)),
+          ]),
+        ),
+        pw.SizedBox(height: 10),
+        pw.Text('Tienda Física: ${usd(physicalUsd)} (${bs(physicalUsd, currentRate)})   |   '
+            'Tienda Online: ${usd(onlineUsd)} (${bs(onlineUsd, currentRate)})',
+            style: const pw.TextStyle(fontSize: 10)),
+        pw.SizedBox(height: 14),
+        pw.Text('Desglose por método de pago', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+        pw.SizedBox(height: 6),
+        if (byMethod.isEmpty)
+          pw.Text('Sin ventas registradas este día.')
+        else
+          pw.TableHelper.fromTextArray(
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9.5),
+            headerDecoration: const pw.BoxDecoration(color: _pdfPink),
+            cellStyle: const pw.TextStyle(fontSize: 9),
+            headers: ['Método de pago', 'Operaciones', 'Total USD', 'Total Bs'],
+            data: [
+              for (final e in byMethod.entries)
+                [e.key, '${e.value.count}', usd(e.value.usdTotal), bs(e.value.usdTotal, currentRate)],
+            ],
+          ),
+        if (dayOrders.isNotEmpty) ...[
+          pw.SizedBox(height: 16),
+          pw.Text('Detalle de operaciones', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+          pw.SizedBox(height: 6),
+          pw.TableHelper.fromTextArray(
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 8.5),
+            headerDecoration: const pw.BoxDecoration(color: _pdfPink),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            headers: ['N°', 'Hora', 'Canal', 'Cliente', 'Pago', 'Total \$', 'Ganancia'],
+            data: [
+              for (final o in dayOrders)
+                [
+                  o.id,
+                  fmtDate(o.date).split(' ').last,
+                  o.channel,
+                  o.customerName,
+                  o.paymentMethod,
+                  usd(o.total),
+                  usd(o.estimatedProfit),
+                ],
+            ],
+          ),
+        ],
+      ],
     ));
     return doc.save();
   }

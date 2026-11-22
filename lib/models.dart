@@ -72,7 +72,8 @@ class Product {
   String image; // URL, ruta de archivo local o asset
   List<String> sizes;
   List<String> colors;
-  int stock;
+  Map<String, int> colorStock; // stock separado por color
+  int _generalStock; // usado solo si el producto no tiene colores
   bool active;
 
   Product({
@@ -80,14 +81,76 @@ class Product {
     required this.name,
     required this.description,
     required this.price,
-    this.costPrice = 0,
+    double? costPrice,
     required this.categoryId,
     required this.image,
     this.sizes = const [],
     this.colors = const [],
-    this.stock = 20,
+    Map<String, int>? colorStock,
+    int stock = 20,
     this.active = true,
-  });
+  })  : costPrice = costPrice ?? (price > 5 ? double.parse((price - 5).toStringAsFixed(2)) : 0),
+        colorStock = _buildColorStock(colors, colorStock, stock),
+        _generalStock = stock;
+
+  static Map<String, int> _buildColorStock(
+      List<String> colors, Map<String, int>? explicit, int fallbackTotal) {
+    if (colors.isEmpty) return {};
+    if (explicit != null && explicit.isNotEmpty) {
+      return {for (final c in colors) c: (explicit[c] ?? 0).clamp(0, 1 << 30)};
+    }
+    // Reparte el stock total equitativamente entre los colores si no venía desglosado.
+    final base = fallbackTotal ~/ colors.length;
+    var rem = fallbackTotal % colors.length;
+    final map = <String, int>{};
+    for (final c in colors) {
+      map[c] = base + (rem > 0 ? 1 : 0);
+      if (rem > 0) rem--;
+    }
+    return map;
+  }
+
+  int get stock =>
+      colors.isNotEmpty ? colors.fold(0, (s, c) => s + (colorStock[c] ?? 0)) : _generalStock;
+
+  set stock(int value) {
+    final clean = value < 0 ? 0 : value;
+    if (colors.isEmpty) {
+      _generalStock = clean;
+    } else {
+      colorStock = _buildColorStock(colors, null, clean);
+    }
+  }
+
+  int stockForColor(String? color) {
+    if (colors.isEmpty || color == null) return stock;
+    return colorStock[color] ?? 0;
+  }
+
+  void setStockForColor(String? color, int value) {
+    final clean = value < 0 ? 0 : value;
+    if (colors.isEmpty || color == null) {
+      _generalStock = clean;
+    } else {
+      colorStock[color] = clean;
+    }
+  }
+
+  void addStockForColor(String? color, int delta) {
+    setStockForColor(color, stockForColor(color) + delta);
+  }
+
+  void syncColors(List<String> newColors, Map<String, int> newMap) {
+    colors = List<String>.from(newColors);
+    if (colors.isEmpty) {
+      colorStock = {};
+    } else {
+      colorStock = {for (final c in colors) c: (newMap[c] ?? 0).clamp(0, 1 << 30)};
+    }
+  }
+
+  String get colorStockSummary =>
+      colors.isEmpty ? '$stock unid.' : colors.map((c) => '$c: ${colorStock[c] ?? 0}').join(' • ');
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -99,23 +162,29 @@ class Product {
         'image': image,
         'sizes': sizes,
         'colors': colors,
+        'colorStock': colorStock,
         'stock': stock,
         'active': active,
       };
 
-  factory Product.fromJson(Map<String, dynamic> j) => Product(
-        id: j['id'],
-        name: j['name'],
-        description: j['description'] ?? '',
-        price: (j['price'] as num).toDouble(),
-        costPrice: (j['costPrice'] as num?)?.toDouble() ?? 0,
-        categoryId: j['categoryId'],
-        image: j['image'] ?? '',
-        sizes: List<String>.from(j['sizes'] ?? []),
-        colors: List<String>.from(j['colors'] ?? []),
-        stock: j['stock'] ?? 0,
-        active: j['active'] ?? true,
-      );
+  factory Product.fromJson(Map<String, dynamic> j) {
+    final rawMap = j['colorStock'] as Map<String, dynamic>?;
+    final parsedMap = rawMap?.map((k, v) => MapEntry(k, (v as num).toInt()));
+    return Product(
+      id: j['id'],
+      name: j['name'],
+      description: j['description'] ?? '',
+      price: (j['price'] as num).toDouble(),
+      costPrice: (j['costPrice'] as num?)?.toDouble() ?? 0,
+      categoryId: j['categoryId'],
+      image: j['image'] ?? '',
+      sizes: List<String>.from(j['sizes'] ?? []),
+      colors: List<String>.from(j['colors'] ?? []),
+      colorStock: parsedMap,
+      stock: j['stock'] ?? 0,
+      active: j['active'] ?? true,
+    );
+  }
 }
 
 class CartItem {
@@ -147,7 +216,7 @@ class Settings {
   double shippingCost; // USD
   double freeShippingFrom; // USD
   List<DiscountRule> discounts;
-  Map<String, int> customColors; // colores creados por el admin
+  Map<String, int> customColors;
 
   Settings({
     this.exchangeRate = 40.0,
@@ -192,7 +261,8 @@ class StoredUser {
   final String email;
   String phone;
   String passwordHash;
-  String role; // 'admin' | 'cliente'
+  String role; // 'admin' | 'cajero' | 'cliente'
+  bool active;
   final DateTime createdAt;
 
   StoredUser({
@@ -201,10 +271,12 @@ class StoredUser {
     required this.phone,
     required this.passwordHash,
     this.role = 'cliente',
+    this.active = true,
     DateTime? createdAt,
   }) : createdAt = createdAt ?? DateTime.now();
 
   bool get isAdmin => role == 'admin';
+  bool get isCashier => role == 'cajero';
 
   Map<String, dynamic> toJson() => {
         'name': name,
@@ -212,6 +284,7 @@ class StoredUser {
         'phone': phone,
         'passwordHash': passwordHash,
         'role': role,
+        'active': active,
         'createdAt': createdAt.toIso8601String(),
       };
 
@@ -221,6 +294,7 @@ class StoredUser {
         phone: j['phone'] ?? '',
         passwordHash: j['passwordHash'],
         role: j['role'] ?? 'cliente',
+        active: j['active'] ?? true,
         createdAt: DateTime.tryParse(j['createdAt'] ?? ''),
       );
 }
@@ -229,8 +303,12 @@ class AppUser {
   final String name;
   final String email;
   final String phone;
-  final bool isAdmin;
-  const AppUser({required this.name, required this.email, this.phone = '', this.isAdmin = false});
+  final String role; // 'admin' | 'cajero' | 'cliente'
+  const AppUser({required this.name, required this.email, this.phone = '', this.role = 'cliente'});
+
+  bool get isAdmin => role == 'admin';
+  bool get isCashier => role == 'cajero';
+  bool get isStaff => isAdmin || isCashier;
 }
 
 class OrderLine {
@@ -285,9 +363,12 @@ class OrderLine {
 class Order {
   final String id;
   final DateTime date;
+  final String channel; // 'Online' | 'Tienda física'
+  final String cashierName; // nombre del cajero/admin o 'Online'
   final String customerName;
   final String customerEmail;
   final String customerPhone;
+  final String customerDocument; // cédula en tienda física (opcional)
   final String country;
   final String city;
   final String address;
@@ -304,9 +385,12 @@ class Order {
   Order({
     required this.id,
     required this.date,
+    this.channel = 'Online',
+    this.cashierName = '',
     required this.customerName,
     required this.customerEmail,
     this.customerPhone = '',
+    this.customerDocument = '',
     required this.country,
     required this.city,
     required this.address,
@@ -322,13 +406,18 @@ class Order {
   });
 
   int get units => lines.fold(0, (s, l) => s + l.qty);
+  double get estimatedProfit => lines.fold(0.0, (s, l) => s + l.estimatedProfit);
+  bool get isPhysical => channel == 'Tienda física';
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'date': date.toIso8601String(),
+        'channel': channel,
+        'cashierName': cashierName,
         'customerName': customerName,
         'customerEmail': customerEmail,
         'customerPhone': customerPhone,
+        'customerDocument': customerDocument,
         'country': country,
         'city': city,
         'address': address,
@@ -346,13 +435,16 @@ class Order {
   factory Order.fromJson(Map<String, dynamic> j) => Order(
         id: j['id'],
         date: DateTime.parse(j['date']),
+        channel: j['channel'] ?? 'Online',
+        cashierName: j['cashierName'] ?? '',
         customerName: j['customerName'],
-        customerEmail: j['customerEmail'],
+        customerEmail: j['customerEmail'] ?? '',
         customerPhone: j['customerPhone'] ?? '',
-        country: j['country'],
-        city: j['city'],
-        address: j['address'],
-        postalCode: j['postalCode'],
+        customerDocument: j['customerDocument'] ?? '',
+        country: j['country'] ?? '',
+        city: j['city'] ?? '',
+        address: j['address'] ?? '',
+        postalCode: j['postalCode'] ?? '',
         paymentMethod: j['paymentMethod'],
         paymentDetails: j['paymentDetails'] ?? '',
         lines: (j['lines'] as List).map((e) => OrderLine.fromJson(e)).toList(),
@@ -364,14 +456,13 @@ class Order {
       );
 }
 
-/// Proveedor de mercancía.
 class Supplier {
   final String id;
   String name;
   String phone;
   String email;
   String city;
-  String specialty; // qué categorías o prendas surte
+  String specialty;
   String notes;
   final DateTime createdAt;
 
@@ -412,13 +503,15 @@ class Supplier {
 class PurchaseLine {
   final String productId;
   final String productName;
+  final String? color;
   final int qty;
   final double unitCost;
-  final String? note; // color/talla recibida
+  final String? note;
 
   PurchaseLine({
     required this.productId,
     required this.productName,
+    this.color,
     required this.qty,
     required this.unitCost,
     this.note,
@@ -429,6 +522,7 @@ class PurchaseLine {
   Map<String, dynamic> toJson() => {
         'productId': productId,
         'productName': productName,
+        'color': color,
         'qty': qty,
         'unitCost': unitCost,
         'note': note,
@@ -437,13 +531,13 @@ class PurchaseLine {
   factory PurchaseLine.fromJson(Map<String, dynamic> j) => PurchaseLine(
         productId: j['productId'] ?? '',
         productName: j['productName'],
+        color: j['color'],
         qty: j['qty'],
         unitCost: (j['unitCost'] as num).toDouble(),
         note: j['note'],
       );
 }
 
-/// Llegada de mercancía / compra a un proveedor.
 class SupplierPurchase {
   final String id;
   final DateTime date;
@@ -494,7 +588,6 @@ class SupplierPurchase {
       );
 }
 
-/// Movimiento de inventario (entrada por proveedor, salida por venta, o ajuste).
 class StockMovement {
   final String id;
   final DateTime date;
@@ -548,6 +641,7 @@ class Country {
   const Country(this.name, this.code, this.flag, this.postalHint, this.postalPattern);
 }
 
+/// Métodos de pago para tienda ONLINE.
 enum PaymentMethod {
   paypal('PayPal', 'Pago rápido con tu cuenta PayPal', Icons.account_balance_wallet, Color(0xFF003087)),
   card('Tarjeta de crédito / débito', 'Visa, Mastercard o débito internacional', Icons.credit_card, Color(0xFF6A1B9A)),
@@ -559,6 +653,22 @@ enum PaymentMethod {
   cash('Efectivo físico', 'Dólares (\$) o Bolívares (Bs) al recibir', Icons.payments, Color(0xFFEF6C00));
 
   const PaymentMethod(this.label, this.subtitle, this.icon, this.color);
+  final String label;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+}
+
+/// Métodos de pago exclusivos de TIENDA FÍSICA (Caja / Ventas).
+enum PhysicalPaymentMethod {
+  pos('Punto de Venta', 'Tarjeta débito / crédito en tienda (Bs)', Icons.point_of_sale, Color(0xFF6A1B9A)),
+  pagoMovil('Pago Móvil', 'Transferencia inmediata en Bs', Icons.phone_android, Color(0xFF00897B)),
+  cashUsd('Efectivo Dólares (\$)', 'Pago en divisas en caja', Icons.attach_money, Color(0xFF2E7D32)),
+  cashBs('Efectivo Bolívares (Bs)', 'Pago en efectivo moneda nacional', Icons.payments_outlined, Color(0xFFEF6C00)),
+  zelle('Zelle', 'Transferencia en dólares (\$)', Icons.flash_on, Color(0xFF6D1ED4)),
+  transfer('Transferencia bancaria', 'Transferencia nacional en Bs', Icons.account_balance, Color(0xFF1565C0));
+
+  const PhysicalPaymentMethod(this.label, this.subtitle, this.icon, this.color);
   final String label;
   final String subtitle;
   final IconData icon;

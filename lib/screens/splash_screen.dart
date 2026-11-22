@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../main.dart' show expandMainWindow;
 import '../theme.dart';
-import 'home_screen.dart';
+import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -67,7 +67,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     expandMainWindow();
     Navigator.of(context).pushReplacement(PageRouteBuilder(
       transitionDuration: const Duration(milliseconds: 600),
-      pageBuilder: (_, a, _) => FadeTransition(opacity: a, child: const HomeScreen()),
+      pageBuilder: (_, a, _) => FadeTransition(opacity: a, child: const LoginScreen(isEntryGate: true)),
     ));
   }
 

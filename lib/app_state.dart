@@ -4,9 +4,11 @@ import 'data.dart';
 import 'db.dart';
 import 'models.dart';
 
-/// Credenciales del administrador inicial (se pueden cambiar en el panel).
+/// Credenciales iniciales (se pueden cambiar desde el Panel Admin).
 const kDefaultAdminEmail = 'admin@naysport.com';
 const kDefaultAdminPassword = 'Admin2026!';
+const kDefaultCashierEmail = 'cajero@naysport.com';
+const kDefaultCashierPassword = 'Cajero2026!';
 
 /// Estado global de la app + persistencia en la base de datos local.
 class AppState extends ChangeNotifier {
@@ -44,6 +46,7 @@ class AppState extends ChangeNotifier {
       purchases = (data['purchases'] as List? ?? []).map((e) => SupplierPurchase.fromJson(e)).toList();
       movements = (data['movements'] as List? ?? []).map((e) => StockMovement.fromJson(e)).toList();
       settings = Settings.fromJson(data['settings'] ?? {});
+
       final dbVersion = (data['version'] as num?)?.toInt() ?? 1;
       if (dbVersion < 6) {
         products.removeWhere((p) => kLegacyDummyIds.contains(p.id));
@@ -56,7 +59,20 @@ class AppState extends ChangeNotifier {
           insertAt++;
         }
       }
+      if (dbVersion < 7) {
+        final seedMap = {for (final s in seedProducts()) s.id: s};
+        for (final p in products) {
+          if (p.costPrice == 0 && p.price > 5) {
+            p.costPrice = double.parse((p.price - 5).toStringAsFixed(2));
+          }
+          final seed = seedMap[p.id];
+          if (seed != null && seed.colorStock.isNotEmpty) {
+            p.colorStock = Map<String, int>.from(seed.colorStock);
+          }
+        }
+      }
     }
+
     if (!users.any((u) => u.isAdmin)) {
       users.add(StoredUser(
         name: 'Administrador NaySport',
@@ -66,12 +82,22 @@ class AppState extends ChangeNotifier {
         role: 'admin',
       ));
     }
+    if (!users.any((u) => u.isCashier)) {
+      users.add(StoredUser(
+        name: 'Cajero NaySport',
+        email: kDefaultCashierEmail,
+        phone: '',
+        passwordHash: LocalDb.hash(kDefaultCashierPassword),
+        role: 'cajero',
+      ));
+    }
+
     loaded = true;
     await save();
   }
 
   Future<void> save() => LocalDb.write({
-        'version': 6,
+        'version': 7,
         'categories': categories.map((e) => e.toJson()).toList(),
         'products': products.map((e) => e.toJson()).toList(),
         'orders': orders.map((e) => e.toJson()).toList(),
@@ -89,9 +115,7 @@ class AppState extends ChangeNotifier {
 
   // ---------------------------------------------------------------- catálogo / colores
   List<Product> get activeProducts => products.where((p) => p.active).toList();
-
   List<String> get allColorNames => {...kColorPalette.keys, ...settings.customColors.keys}.toList();
-
   int colorHexFor(String name) => settings.customColors[name] ?? kColorPalette[name] ?? 0xFFCCCCCC;
 
   Future<void> addCustomColor(String name, int colorValue) async {
@@ -119,8 +143,6 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------- BCV API
-  /// Sincroniza la tasa de cambio desde ve.dolarapi.com ('BCV Oficial' o 'Paralelo').
-  /// Si no hay internet o falla, conserva la última tasa guardada y devuelve false.
   Future<bool> syncBcvRate({String? source}) async {
     final targetSource = source ?? (settings.rateSource == 'Paralelo' ? 'Paralelo' : 'BCV Oficial');
     final rates = await BcvService.fetch(timeout: const Duration(seconds: 3));
@@ -143,13 +165,14 @@ class AppState extends ChangeNotifier {
     return best;
   }
 
-  int qtyInCart(String productId) =>
-      _items.where((i) => i.product.id == productId).fold(0, (s, i) => s + i.quantity);
+  int qtyInCart(String productId, {String? color}) => _items
+      .where((i) => i.product.id == productId && (color == null || i.color == color))
+      .fold(0, (s, i) => s + i.quantity);
 
   double discountPercentFor(CartItem item) => discountFor(qtyInCart(item.product.id));
   double discountAmountFor(CartItem item) => item.gross * discountPercentFor(item) / 100;
 
-  // ---------------------------------------------------------------- carrito
+  // ---------------------------------------------------------------- carrito online
   List<CartItem> get items => List.unmodifiable(_items);
   int get itemCount => _items.fold(0, (s, i) => s + i.quantity);
   double get subtotal => _items.fold(0.0, (s, i) => s + i.gross);
@@ -159,10 +182,15 @@ class AppState extends ChangeNotifier {
       _items.isEmpty ? 0 : (afterDiscount >= settings.freeShippingFrom ? 0 : settings.shippingCost);
   double get total => afterDiscount + shipping;
 
-  int availableFor(Product p) => p.stock - qtyInCart(p.id);
+  int availableFor(Product p, {String? color}) {
+    if (color != null && p.colors.isNotEmpty) {
+      return p.stockForColor(color) - qtyInCart(p.id, color: color);
+    }
+    return p.stock - qtyInCart(p.id);
+  }
 
   bool add(Product p, {String? size, String? color, int qty = 1}) {
-    if (availableFor(p) < qty) return false;
+    if (availableFor(p, color: color) < qty) return false;
     final existing = _items.where((i) => i.product.id == p.id && i.size == size && i.color == color);
     if (existing.isNotEmpty) {
       existing.first.quantity += qty;
@@ -174,7 +202,7 @@ class AppState extends ChangeNotifier {
   }
 
   bool increment(CartItem item) {
-    if (availableFor(item.product) <= 0) return false;
+    if (availableFor(item.product, color: item.color) <= 0) return false;
     item.quantity++;
     notifyListeners();
     return true;
@@ -214,13 +242,23 @@ class AppState extends ChangeNotifier {
     );
   }
 
-  Future<void> adjustStock(Product p, int newStock, {String reason = 'Ajuste manual'}) async {
+  Future<void> adjustColorStock(Product p, String? color, int newStock, {String reason = 'Ajuste manual'}) async {
     final clean = newStock < 0 ? 0 : newStock;
-    final delta = clean - p.stock;
+    final prev = p.stockForColor(color);
+    final delta = clean - prev;
     if (delta == 0) return;
-    p.stock = clean;
-    _logMovement(p, delta > 0 ? 'entrada' : 'ajuste', delta, reason);
+    p.setStockForColor(color, clean);
+    final label = color != null && p.colors.isNotEmpty ? '$reason ($color)' : reason;
+    _logMovement(p, delta > 0 ? 'entrada' : 'ajuste', delta, label);
     await commit();
+  }
+
+  Future<void> adjustStock(Product p, int newStock, {String reason = 'Ajuste manual'}) async {
+    if (p.colors.isNotEmpty) {
+      await adjustColorStock(p, p.colors.first, newStock, reason: reason);
+    } else {
+      await adjustColorStock(p, null, newStock, reason: reason);
+    }
   }
 
   Future<void> deleteProduct(Product p) async {
@@ -241,7 +279,7 @@ class AppState extends ChangeNotifier {
     await commit();
   }
 
-  /// Registra una llegada de mercancía de proveedor y suma el stock automático.
+  /// Registra una llegada de mercancía de proveedor y suma el stock automático al color indicado.
   Future<SupplierPurchase> recordSupplierPurchase({
     required Supplier supplier,
     required String invoiceRef,
@@ -264,13 +302,14 @@ class AppState extends ChangeNotifier {
     for (final line in lines) {
       final p = productById(line.productId);
       if (p != null) {
-        p.stock += line.qty;
+        final targetColor = line.color ?? (p.colors.isNotEmpty ? p.colors.first : null);
+        p.addStockForColor(targetColor, line.qty);
         if (line.unitCost > 0) p.costPrice = line.unitCost;
         _logMovement(
           p,
           'entrada',
           line.qty,
-          'Proveedor: ${supplier.name}${invoiceRef.isNotEmpty ? ' (Fact. $invoiceRef)' : ''}',
+          'Proveedor: ${supplier.name}${targetColor != null ? ' ($targetColor)' : ''}${invoiceRef.isNotEmpty ? ' [Fact. $invoiceRef]' : ''}',
         );
       }
     }
@@ -279,7 +318,7 @@ class AppState extends ChangeNotifier {
     return purchase;
   }
 
-  /// Registra la venta, descuenta el stock, guarda el movimiento y vacía el carrito.
+  /// Venta ONLINE desde el carrito del cliente.
   Future<Order> placeOrder({
     required String customerPhone,
     required String country,
@@ -292,6 +331,8 @@ class AppState extends ChangeNotifier {
     final order = Order(
       id: 'NS-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
       date: DateTime.now(),
+      channel: 'Online',
+      cashierName: 'Tienda Online',
       customerName: _user?.name ?? 'Invitado',
       customerEmail: _user?.email ?? '',
       customerPhone: customerPhone,
@@ -321,8 +362,13 @@ class AppState extends ChangeNotifier {
       exchangeRate: settings.exchangeRate,
     );
     for (final i in _items) {
-      i.product.stock = (i.product.stock - i.quantity).clamp(0, 1 << 30);
-      _logMovement(i.product, 'salida', -i.quantity, 'Venta ${order.id} (${order.customerName})');
+      i.product.addStockForColor(i.color, -i.quantity);
+      _logMovement(
+        i.product,
+        'salida',
+        -i.quantity,
+        'Venta online ${order.id}${i.color != null ? ' (${i.color})' : ''} - ${order.customerName}',
+      );
     }
     orders.insert(0, order);
     _items.clear();
@@ -330,10 +376,85 @@ class AppState extends ChangeNotifier {
     return order;
   }
 
+  /// Venta en TIENDA FÍSICA registrada desde Caja / Ventas.
+  /// El descuento por cantidad aplica sumando el total de artículos de la compra (ej. 3 zapatos distintos -> -5%).
+  Future<Order> placePhysicalSale({
+    required List<CartItem> saleItems,
+    required String customerName,
+    String customerDocument = '',
+    String customerPhone = '',
+    required String paymentMethod,
+    String paymentDetails = '',
+  }) async {
+    final totalUnits = saleItems.fold(0, (s, i) => s + i.quantity);
+    final pct = discountFor(totalUnits);
+    final sub = saleItems.fold(0.0, (s, i) => s + i.gross);
+    final disc = sub * pct / 100;
+    final tot = sub - disc;
+
+    final order = Order(
+      id: 'CJ-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
+      date: DateTime.now(),
+      channel: 'Tienda física',
+      cashierName: _user?.name ?? 'Cajero',
+      customerName: customerName.trim().isEmpty ? 'Cliente de mostrador' : customerName.trim(),
+      customerEmail: '',
+      customerPhone: customerPhone.trim(),
+      customerDocument: customerDocument.trim(),
+      country: 'Tienda física',
+      city: 'Mostrador',
+      address: 'Retiro en tienda',
+      postalCode: '-',
+      paymentMethod: paymentMethod,
+      paymentDetails: paymentDetails,
+      lines: [
+        for (final i in saleItems)
+          OrderLine(
+            productId: i.product.id,
+            productName: i.product.name,
+            size: i.size,
+            color: i.color,
+            qty: i.quantity,
+            unitPrice: i.product.price,
+            unitCost: i.product.costPrice,
+            discountPercent: pct,
+          ),
+      ],
+      subtotal: sub,
+      discount: disc,
+      shipping: 0,
+      total: tot,
+      exchangeRate: settings.exchangeRate,
+    );
+
+    for (final i in saleItems) {
+      i.product.addStockForColor(i.color, -i.quantity);
+      _logMovement(
+        i.product,
+        'salida',
+        -i.quantity,
+        'Venta en tienda ${order.id}${i.color != null ? ' (${i.color})' : ''} - ${order.customerName}',
+      );
+    }
+    orders.insert(0, order);
+    await commit();
+    return order;
+  }
+
+  List<Order> ordersForDay(DateTime day, {String? channel, String? cashierName}) => orders.where((o) {
+        final sameDay = o.date.year == day.year && o.date.month == day.month && o.date.day == day.day;
+        if (!sameDay) return false;
+        if (channel != null && o.channel != channel) return false;
+        if (cashierName != null && o.cashierName != cashierName) return false;
+        return true;
+      }).toList();
+
   // ---------------------------------------------------------------- usuarios
   AppUser? get user => _user;
   bool get isLoggedIn => _user != null;
   bool get isAdmin => _user?.isAdmin ?? false;
+  bool get isCashier => _user?.isCashier ?? false;
+  bool get isStaff => _user?.isStaff ?? false;
 
   StoredUser? findUser(String email) {
     final e = email.trim().toLowerCase();
@@ -346,7 +467,8 @@ class AppState extends ChangeNotifier {
   String? loginWithEmail(String email, String password) {
     final u = findUser(email);
     if (u == null || u.passwordHash != LocalDb.hash(password)) return 'Correo o contraseña incorrectos';
-    _user = AppUser(name: u.name, email: u.email, phone: u.phone, isAdmin: u.isAdmin);
+    if (!u.active) return 'Esta cuenta fue desactivada por el administrador';
+    _user = AppUser(name: u.name, email: u.email, phone: u.phone, role: u.role);
     notifyListeners();
     return null;
   }
@@ -356,11 +478,20 @@ class AppState extends ChangeNotifier {
     required String email,
     required String phone,
     required String password,
+    String role = 'cliente',
   }) async {
     if (findUser(email) != null) return 'Ese correo ya está registrado';
-    final u = StoredUser(name: name, email: email.trim(), phone: phone, passwordHash: LocalDb.hash(password));
+    final u = StoredUser(
+      name: name,
+      email: email.trim(),
+      phone: phone,
+      passwordHash: LocalDb.hash(password),
+      role: role,
+    );
     users.add(u);
-    _user = AppUser(name: u.name, email: u.email, phone: u.phone);
+    if (role == 'cliente') {
+      _user = AppUser(name: u.name, email: u.email, phone: u.phone, role: u.role);
+    }
     await commit();
     return null;
   }

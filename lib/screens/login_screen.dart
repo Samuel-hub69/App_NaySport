@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import '../admin/admin_screen.dart';
 import '../app_state.dart';
 import '../format.dart';
 import '../theme.dart';
+import 'cashier_screen.dart';
+import 'home_screen.dart';
 
 final _emailRe = RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$');
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  /// true cuando aparece al abrir la app (redirige según rol y permite entrar como visitante).
+  /// false cuando se abre desde el carrito o la tienda para iniciar sesión antes de pagar.
+  final bool isEntryGate;
+  const LoginScreen({super.key, this.isEntryGate = false});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -17,8 +23,24 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _success() {
     final u = AppScope.read(context).user!;
-    showSnack(context, u.isAdmin ? 'Sesión de administrador iniciada' : 'Bienvenida, ${u.name}');
-    Navigator.pop(context, true);
+    final msg = u.isAdmin
+        ? 'Sesión de administrador iniciada'
+        : (u.isCashier ? 'Bienvenido a Caja, ${u.name}' : 'Bienvenida, ${u.name}');
+    showSnack(context, msg);
+
+    if (!widget.isEntryGate) {
+      Navigator.pop(context, true);
+      return;
+    }
+
+    final Widget next = u.isAdmin
+        ? const AdminScreen()
+        : (u.isCashier ? const CashierScreen() : const HomeScreen());
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => next));
+  }
+
+  void _enterAsGuest() {
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
   }
 
   @override
@@ -46,18 +68,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   SizedBox(height: 12),
                   BrandName(fontSize: 48, color: Colors.white),
                   SizedBox(height: 12),
-                  Text('Viste tu estilo.\nModa casual y deportiva para ella.',
+                  Text('Viste tu estilo.\nModa casual y deportiva.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)),
                 ],
               ),
             ),
-            Positioned(
-              top: 16,
-              left: 16,
-              child: IconButton.filledTonal(
-                  icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
-            ),
+            if (!widget.isEntryGate)
+              Positioned(
+                top: 16,
+                left: 16,
+                child: IconButton.filledTonal(
+                    icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+              ),
           ]),
         ),
         Expanded(
@@ -75,8 +98,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 6),
                   Text(
                     _registerMode
-                        ? 'Completa tus datos para comprar en NaySport'
-                        : 'Ingresa con tu correo y contraseña',
+                        ? 'Completa tus datos para comprar en línea'
+                        : 'Ingresa como Cliente, Cajero o Administrador',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey.shade600),
                   ),
@@ -87,13 +110,28 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? _RegisterForm(key: const ValueKey('r'), onSuccess: _success)
                         : _LoginForm(key: const ValueKey('l'), onSuccess: _success),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   TextButton(
                     onPressed: () => setState(() => _registerMode = !_registerMode),
                     child: Text(_registerMode
                         ? '¿Ya tienes cuenta? Inicia sesión'
-                        : '¿No tienes cuenta? Regístrate'),
+                        : '¿Eres cliente nuevo? Regístrate aquí'),
                   ),
+                  if (widget.isEntryGate) ...[
+                    const SizedBox(height: 10),
+                    const Row(children: [
+                      Expanded(child: Divider()),
+                      Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('o')),
+                      Expanded(child: Divider()),
+                    ]),
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      icon: const Icon(Icons.storefront_outlined),
+                      label: const Text('Ver tienda sin cuenta (Visitante)'),
+                      onPressed: _enterAsGuest,
+                    ),
+                  ],
                 ]),
               ),
             ),
