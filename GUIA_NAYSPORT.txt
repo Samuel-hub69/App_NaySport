@@ -7,6 +7,17 @@
 - Si estás en tu PC: abre el acceso directo "NaySport" en C:\NaySport.
 - Si te pasaron la carpeta comprimida (.zip): descomprime TODA la carpeta y haz
   doble clic en "naysport.exe". (No saques el .exe solo de la carpeta).
+- Si descargaste el proyecto desde GitHub (en Windows con Flutter actualizado y
+  Visual Studio con "Desarrollo para el escritorio con C++"):
+  1) Abre PowerShell o CMD dentro de la carpeta del proyecto.
+  2) Ejecuta:
+     flutter pub get
+  3) Luego elige una de estas dos formas:
+     * Para abrir la app directo por comando:
+       flutter run -d windows
+     * Para generar el ejecutable (.exe):
+       flutter build windows --release
+       (el programa queda en build\windows\x64\runner\Release\naysport.exe).
 
 Al abrir la app después de la pantalla de carga aparece el Inicio de Sesión:
 - Si entras como ADMINISTRADOR -> entras al Panel Admin completo.
