@@ -48,9 +48,14 @@ class AppState extends ChangeNotifier {
         if (p.id == 'a1' && p.image.contains('handbag?lock=61')) p.image = '';
       }
       final dbVersion = (data['version'] as num?)?.toInt() ?? 1;
-      if (dbVersion < 4) {
-        for (final sp in seedProducts().where((p) => p.id.startsWith('r')).toList().reversed) {
-          if (!products.any((p) => p.id == sp.id)) products.insert(0, sp);
+      if (dbVersion < 5) {
+        final newSeeds = seedProducts().where((p) => p.id.startsWith('r')).toList();
+        var insertAt = 0;
+        for (final sp in newSeeds) {
+          if (!products.any((p) => p.id == sp.id)) {
+            products.insert(insertAt.clamp(0, products.length), sp);
+          }
+          insertAt++;
         }
       }
     }
@@ -68,7 +73,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> save() => LocalDb.write({
-        'version': 4,
+        'version': 5,
         'categories': categories.map((e) => e.toJson()).toList(),
         'products': products.map((e) => e.toJson()).toList(),
         'orders': orders.map((e) => e.toJson()).toList(),
