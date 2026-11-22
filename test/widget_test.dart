@@ -35,8 +35,8 @@ void main() {
     final state = AppState();
     await state.load();
 
-    // Verificar catálogo completo (45 productos reales) y rol Cajero
-    expect(state.products.length, greaterThanOrEqualTo(45));
+    // Verificar catálogo completo (59 productos reales) y rol Cajero
+    expect(state.products.length, greaterThanOrEqualTo(59));
     for (final p in state.products) {
       expect(File(p.image).existsSync(), isTrue, reason: 'Falta imagen ${p.image}');
     }

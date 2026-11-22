@@ -71,7 +71,7 @@ class AppState extends ChangeNotifier {
           }
         }
       }
-      if (dbVersion < 9) {
+      if (dbVersion < 10) {
         final newSeeds = seedProducts().where((p) {
           final n = int.tryParse(p.id.replaceFirst('r', '')) ?? 0;
           return n >= 16;
@@ -108,7 +108,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> save() => LocalDb.write({
-        'version': 9,
+        'version': 10,
         'categories': categories.map((e) => e.toJson()).toList(),
         'products': products.map((e) => e.toJson()).toList(),
         'orders': orders.map((e) => e.toJson()).toList(),
