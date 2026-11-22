@@ -8,6 +8,8 @@ import 'cart_screen.dart';
 import 'cashier_screen.dart';
 import 'login_screen.dart';
 
+const _kStoreDarkSurface = Color(0xFF141418);
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -32,8 +34,8 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(76),
         child: Material(
-          color: Colors.white,
-          elevation: 1,
+          color: _kStoreDarkSurface,
+          elevation: 2,
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -48,9 +50,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: TextField(
                     decoration: InputDecoration(
                       hintText: 'Buscar productos...',
-                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: Colors.white,
+                      prefixIcon: const Icon(Icons.search, color: NayColors.primary),
                       isDense: true,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(30)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: const BorderSide(color: NayColors.primary, width: 2),
+                      ),
                     ),
                     onChanged: (v) => setState(() => _query = v),
                   ),
@@ -62,6 +73,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: FilledButton.tonalIcon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: NayColors.primary.withValues(alpha: 0.22),
+                            foregroundColor: Colors.white,
+                          ),
                           icon: const Icon(Icons.admin_panel_settings, size: 18),
                           label: const Text('Panel admin'),
                           onPressed: () => Navigator.push(
@@ -72,6 +87,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: FilledButton.tonalIcon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: NayColors.primary.withValues(alpha: 0.22),
+                            foregroundColor: Colors.white,
+                          ),
                           icon: const Icon(Icons.point_of_sale, size: 18),
                           label: const Text('Ir a Caja'),
                           onPressed: () => Navigator.pushReplacement(
@@ -80,7 +99,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     if (state.isLoggedIn) Flexible(child: _AccountMenu(state: state)) else
                       TextButton.icon(
-                        icon: const Icon(Icons.person_outline),
+                        style: TextButton.styleFrom(foregroundColor: Colors.white),
+                        icon: const Icon(Icons.person_outline, color: NayColors.accent),
                         label: const Text('Iniciar sesión'),
                         onPressed: () => Navigator.push(
                             context, MaterialPageRoute(builder: (_) => const LoginScreen())),
@@ -91,6 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       label: Text('${state.itemCount}'),
                       child: IconButton(
                         tooltip: 'Carrito',
+                        color: Colors.white,
                         icon: const Icon(Icons.shopping_bag_outlined),
                         onPressed: () => Navigator.push(
                             context, MaterialPageRoute(builder: (_) => const CartScreen())),
@@ -181,6 +202,7 @@ class _AccountMenu extends StatelessWidget {
             'Hola, ${u.name.split(' ').first}',
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
           ),
         ),
       ]),
@@ -198,13 +220,13 @@ class _Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 230,
-      color: Colors.white,
+      color: _kStoreDarkSurface,
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: 16),
         children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(28, 0, 0, 8),
-            child: Text('CATEGORÍAS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+            child: Text('CATEGORÍAS', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFBDB3B8))),
           ),
           _CategorySidebarItem(
             label: 'Todo',
@@ -249,7 +271,7 @@ class _CategorySidebarItemState extends State<_CategorySidebarItem> {
   Widget build(BuildContext context) {
     final active = widget.selected;
     final hovered = _hovered;
-    final fgColor = hovered ? Colors.white : (active ? NayColors.primary : Colors.grey.shade800);
+    final fgColor = hovered ? Colors.white : (active ? NayColors.accent : Colors.white70);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
@@ -262,7 +284,7 @@ class _CategorySidebarItemState extends State<_CategorySidebarItem> {
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
             hoverColor: Colors.transparent,
-            splashColor: NayColors.primary.withValues(alpha: 0.2),
+            splashColor: NayColors.primary.withValues(alpha: 0.25),
             onTap: widget.onTap,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
@@ -273,11 +295,13 @@ class _CategorySidebarItemState extends State<_CategorySidebarItem> {
                 gradient: hovered
                     ? const LinearGradient(colors: [NayColors.primary, Color(0xFFFF7EB6)])
                     : null,
-                color: hovered ? null : (active ? NayColors.logoBg : Colors.transparent),
+                color: hovered
+                    ? null
+                    : (active ? NayColors.primary.withValues(alpha: 0.22) : Colors.transparent),
                 border: Border.all(
                   color: hovered
                       ? NayColors.primary
-                      : (active ? NayColors.primary.withValues(alpha: 0.45) : Colors.transparent),
+                      : (active ? NayColors.primary.withValues(alpha: 0.85) : Colors.transparent),
                 ),
                 boxShadow: hovered
                     ? [
@@ -296,7 +320,7 @@ class _CategorySidebarItemState extends State<_CategorySidebarItem> {
                   child: Text(
                     widget.label,
                     style: TextStyle(
-                      color: hovered ? Colors.white : (active ? NayColors.dark : Colors.grey.shade800),
+                      color: hovered ? Colors.white : (active ? Colors.white : Colors.white.withValues(alpha: 0.9)),
                       fontWeight: (hovered || active) ? FontWeight.bold : FontWeight.w500,
                       fontSize: 14.5,
                     ),

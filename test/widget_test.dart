@@ -218,6 +218,14 @@ void main() {
     await tester.pump();
 
     expect(find.byIcon(Icons.chevron_right), findsNothing);
+    expect(
+      find.byWidgetPredicate((w) => w is Material && w.color == const Color(0xFF141418)),
+      findsOneWidget,
+    );
+    expect(
+      find.byWidgetPredicate((w) => w is Container && w.color == const Color(0xFF141418)),
+      findsOneWidget,
+    );
 
     final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await gesture.addPointer(location: Offset.zero);
