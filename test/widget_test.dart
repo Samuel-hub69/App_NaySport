@@ -35,8 +35,11 @@ void main() {
     final state = AppState();
     await state.load();
 
-    // Verificar rol Cajero predeterminado y métodos de pago físicos permitidos
-    expect(state.products.length, greaterThanOrEqualTo(30));
+    // Verificar catálogo completo (45 productos reales) y rol Cajero
+    expect(state.products.length, greaterThanOrEqualTo(45));
+    for (final p in state.products) {
+      expect(File(p.image).existsSync(), isTrue, reason: 'Falta imagen ${p.image}');
+    }
     final jeansNegro = state.products.firstWhere((p) => p.id == 'r18');
     expect(jeansNegro.stock, 12);
     expect(jeansNegro.costPrice, jeansNegro.price - 5);

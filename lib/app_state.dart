@@ -71,12 +71,12 @@ class AppState extends ChangeNotifier {
           }
         }
       }
-      if (dbVersion < 8) {
-        final batch2 = seedProducts().where((p) {
+      if (dbVersion < 9) {
+        final newSeeds = seedProducts().where((p) {
           final n = int.tryParse(p.id.replaceFirst('r', '')) ?? 0;
           return n >= 16;
         });
-        for (final sp in batch2) {
+        for (final sp in newSeeds) {
           if (!products.any((p) => p.id == sp.id)) {
             products.add(sp);
           }
@@ -108,7 +108,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> save() => LocalDb.write({
-        'version': 8,
+        'version': 9,
         'categories': categories.map((e) => e.toJson()).toList(),
         'products': products.map((e) => e.toJson()).toList(),
         'orders': orders.map((e) => e.toJson()).toList(),
