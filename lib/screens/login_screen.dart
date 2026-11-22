@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app_state.dart';
+import '../format.dart';
 import '../theme.dart';
 
 final _emailRe = RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$');
@@ -248,8 +249,9 @@ class _RegisterFormState extends State<_RegisterForm> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         TextFormField(
           controller: _name,
+          inputFormatters: [nameInputFormatter],
           decoration: const InputDecoration(labelText: 'Nombre completo', prefixIcon: Icon(Icons.person_outline)),
-          validator: (v) => (v ?? '').trim().split(RegExp(r'\s+')).length < 2 ? 'Ingresa nombre y apellido' : null,
+          validator: validateFullName,
         ),
         const SizedBox(height: 14),
         TextFormField(
@@ -260,9 +262,11 @@ class _RegisterFormState extends State<_RegisterForm> {
         const SizedBox(height: 14),
         TextFormField(
           controller: _phone,
+          keyboardType: TextInputType.phone,
+          inputFormatters: const [PlusDigitsPhoneFormatter()],
           decoration: const InputDecoration(
-              labelText: 'Teléfono', prefixIcon: Icon(Icons.phone_outlined), hintText: '+58 414 0000000'),
-          validator: (v) => RegExp(r'^\+?[\d\s\-]{7,18}$').hasMatch(v ?? '') ? null : 'Teléfono no válido',
+              labelText: 'Teléfono', prefixIcon: Icon(Icons.phone_outlined), hintText: '+584140000000'),
+          validator: validatePhone,
         ),
         const SizedBox(height: 14),
         OutlinedButton.icon(

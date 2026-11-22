@@ -335,13 +335,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             flex: 2,
             child: TextFormField(
               controller: _phone,
+              keyboardType: TextInputType.phone,
+              inputFormatters: const [PlusDigitsPhoneFormatter()],
               decoration: const InputDecoration(
                 labelText: 'Teléfono de contacto',
                 prefixIcon: Icon(Icons.phone_outlined),
-                hintText: '+58 414 0000000',
+                hintText: '+584140000000',
               ),
-              validator: (v) =>
-                  RegExp(r'^\+?[\d\s\-]{7,18}$').hasMatch(v?.trim() ?? '') ? null : 'Teléfono no válido',
+              validator: validatePhone,
             ),
           ),
         ]),
@@ -493,13 +494,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Expanded(
               child: TextFormField(
                 controller: _pagoMovilPhone,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(13)],
                 decoration: const InputDecoration(
                     labelText: 'Teléfono desde donde pagas',
                     prefixIcon: Icon(Icons.phone_android),
                     hintText: '04141234567'),
-                validator: (v) => RegExp(r'^\d{10,13}$').hasMatch(v?.replaceAll(RegExp(r'\D'), '') ?? '')
+                validator: (v) => RegExp(r'^\d{10,13}$').hasMatch((v ?? '').trim())
                     ? null
-                    : 'Ingresa un teléfono válido',
+                    : 'Ingresa un teléfono válido (solo dígitos)',
               ),
             ),
             const SizedBox(width: 12),

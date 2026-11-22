@@ -58,9 +58,13 @@ void main() {
     expect(state.add(shirt, size: 'M', color: 'Rosado', qty: 5), isTrue);
     expect(state.discountTotal, closeTo(shirt.price * 5 * 0.10, 0.01));
 
-    // Formato en dólares y bolívares
+    // Formato en dólares y bolívares + validaciones de nombre y teléfono
     expect(usd(10), '\$10.00');
     expect(bs(10, 40), 'Bs 400,00');
+    expect(validateFullName('María Pérez'), isNull);
+    expect(validateFullName('María 123'), isNotNull);
+    expect(validatePhone('+584141234567'), isNull);
+    expect(validatePhone('0414-abc'), isNotNull);
 
     // Ajuste masivo de precios (+10%)
     final updated = await state.adjustPrices(10, categoryId: 'casual');

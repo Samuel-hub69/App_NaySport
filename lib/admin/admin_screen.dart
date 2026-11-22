@@ -1157,8 +1157,10 @@ class _SuppliersTabState extends State<_SuppliersTab> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: phoneCtrl,
-                  decoration: const InputDecoration(labelText: 'Teléfono / WhatsApp'),
-                  validator: (v) => (v ?? '').trim().isEmpty ? 'Requerido' : null,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: const [PlusDigitsPhoneFormatter()],
+                  decoration: const InputDecoration(labelText: 'Teléfono', hintText: '+584140000000'),
+                  validator: validatePhone,
                 ),
                 const SizedBox(height: 12),
                 Row(children: [

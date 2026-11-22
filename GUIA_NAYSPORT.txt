@@ -8,7 +8,26 @@
 - Si te pasaron la carpeta comprimida (.zip): descomprime TODA la carpeta y haz
   doble clic en "naysport.exe". (No saques el .exe solo de la carpeta).
 
-2. CÓMO ENTRAR COMO ADMINISTRADOR
+2. CÓMO FUNCIONA LA TIENDA (VISTA DEL CLIENTE)
+--------------------------------------------------------------------------------
+- Al abrir sale una pantalla de carga pequeña con el logo y luego se maximiza.
+- Arriba está el logo, el nombre "NaySport", el buscador centrado, "Iniciar
+  sesión" y el carrito.
+- Menú izquierdo con categorías (Casual, Deportiva, Calzado, Prendas, Perfumes,
+  Accesorios). Cada producto muestra su precio en dólares ($) y bolívares (Bs).
+- Al hacer clic en un producto puedes elegir color, talla y cantidad. Si lleva
+  varias unidades (ej. 3+, 5+, 10+), el sistema aplica un descuento automático.
+- Para pagar pide iniciar sesión o registrarse (nombre completo solo letras,
+  correo, teléfono solo números y '+', fecha de nacimiento +18 y contraseña
+  segura).
+- Pantalla "Finalizar compra" en 3 pasos horizontales:
+  1) Dirección de envío (país, teléfono, código postal validado por país,
+     ciudad y dirección).
+  2) Método de pago (PayPal, Tarjeta con validación Luhn, Pago Móvil, Zelle,
+     Transferencia, Google Pay, Apple Pay o Efectivo en $ / Bs).
+  3) Confirmar pedido (al finalizar descuenta el stock automáticamente).
+
+3. CÓMO ENTRAR COMO ADMINISTRADOR
 --------------------------------------------------------------------------------
 1) Arriba a la derecha, haz clic en "Iniciar sesión".
 2) Ingresa las credenciales predeterminadas:
@@ -20,7 +39,7 @@
 (Nota: si te registras con el formulario "Regístrate", entras como Cliente
 normal y NO verás el botón de Panel admin).
 
-3. CÓMO FUNCIONA CADA APARTADO DEL PANEL ADMIN
+4. CÓMO FUNCIONA CADA APARTADO DEL PANEL ADMIN
 --------------------------------------------------------------------------------
 
 [1] RESUMEN
@@ -64,9 +83,10 @@ normal y NO verás el botón de Panel admin).
 [3] PROVEEDORES
   Tiene dos vistas arriba: "Llegadas de mercancía" y "Proveedores".
 
-  A) Proveedores (Directorio):
+   A) Proveedores (Directorio):
      - Botón "Nuevo proveedor": registra mayoristas/fábricas con nombre,
-       teléfono/WhatsApp, correo, ciudad/país, qué productos surte y notas.
+       teléfono (solo números y '+' al inicio), correo, ciudad/país, qué
+       productos surte y notas.
 
   B) Llegadas de mercancía (Compras):
      - Botón "Registrar llegada de mercancía": eliges el proveedor, número de
@@ -121,7 +141,7 @@ normal y NO verás el botón de Panel admin).
       en tu PC, permite abrir esa carpeta, cambiar la contraseña del admin y
       restablecer el catálogo inicial de prueba.
 
-4. NOTAS IMPORTANTES DE ESTA VERSIÓN DE PRUEBA
+5. NOTAS IMPORTANTES DE ESTA VERSIÓN DE PRUEBA
 --------------------------------------------------------------------------------
 - Base de datos local: cada PC guarda sus propios cambios en
   %APPDATA%\NaySport\naysport_db.json. En la versión final en producción esto se
