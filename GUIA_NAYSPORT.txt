@@ -77,7 +77,7 @@ normal y NO verás el botón de Panel admin).
      - Registra automáticamente cada cambio de inventario:
        * Entradas (+) cuando llega mercancía de un proveedor o repones stock.
        * Salidas (-) cuando un cliente realiza una compra.
-       * Ajustes manuales realizados por el admin.
+       * Ajustes manuales o eliminación de productos realizados por el admin.
      - Permite limpiar el historial de movimientos sin afectar el stock actual.
 
 [3] PROVEEDORES

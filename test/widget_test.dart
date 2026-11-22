@@ -90,6 +90,10 @@ void main() {
     expect(state.orders.length, 1);
     expect(state.movements.first.type, 'salida');
 
+    // Eliminar producto registra salida en el Kardex
+    await state.deleteProduct(shirt);
+    expect(state.movements.first.reason, 'Producto eliminado del catálogo');
+
     // Recargar desde BD local y verificar persistencia completa
     final reloaded = AppState();
     await reloaded.load();
@@ -97,7 +101,7 @@ void main() {
     expect(reloaded.orders.first.customerPhone, '+58 414 9998877');
     expect(reloaded.suppliers.length, 1);
     expect(reloaded.purchases.length, 1);
-    expect(reloaded.movements.length, 2);
+    expect(reloaded.movements.length, 3);
     expect(reloaded.settings.customColors['Turquesa'], 0xFF009688);
 
     // Generar los 4 PDFs y verificar cabecera %PDF-

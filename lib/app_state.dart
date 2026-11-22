@@ -223,6 +223,24 @@ class AppState extends ChangeNotifier {
     await commit();
   }
 
+  Future<void> deleteProduct(Product p) async {
+    movements.insert(
+      0,
+      StockMovement(
+        id: newId('mov_'),
+        date: DateTime.now(),
+        productId: p.id,
+        productName: p.name,
+        type: 'ajuste',
+        delta: -p.stock,
+        stockAfter: 0,
+        reason: 'Producto eliminado del catálogo',
+      ),
+    );
+    products.remove(p);
+    await commit();
+  }
+
   /// Registra una llegada de mercancía de proveedor y suma el stock automático.
   Future<SupplierPurchase> recordSupplierPurchase({
     required Supplier supplier,

@@ -487,10 +487,7 @@ class _InventoryTabState extends State<_InventoryTab> {
                 onPressed: () async {
                   final ok = await _confirmDialog(
                       context, '¿Eliminar "${p.name}"?', 'Esta acción quitará la prenda del catálogo.');
-                  if (ok) {
-                    state.products.remove(p);
-                    await state.commit();
-                  }
+                  if (ok) await state.deleteProduct(p);
                 },
               ),
             ]),
@@ -527,7 +524,7 @@ class _InventoryTabState extends State<_InventoryTab> {
             title: Text(m.productName, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('${fmtDate(m.date)} • ${m.reason}'),
             trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text('${isIn ? '+' : ''}${m.delta} unid.',
+              Text(m.delta == 0 ? 'Eliminado (0 unid.)' : '${isIn ? '+' : ''}${m.delta} unid.',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: color)),
               Text('Stock quedó en ${m.stockAfter}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
             ]),
@@ -737,6 +734,7 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
       content: SizedBox(
         width: 740,
         child: SingleChildScrollView(
+          padding: const EdgeInsets.only(top: 8, right: 8),
           child: Form(
             key: _form,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
