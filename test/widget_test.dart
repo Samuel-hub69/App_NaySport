@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:naysport/app_state.dart';
@@ -8,6 +9,7 @@ import 'package:naysport/main.dart';
 import 'package:naysport/models.dart';
 import 'package:naysport/pdf_export.dart';
 import 'package:naysport/screens/cashier_screen.dart';
+import 'package:naysport/screens/home_screen.dart';
 
 void main() {
   late Directory tmpDir;
@@ -58,11 +60,13 @@ void main() {
       customerName: 'Carlos Ruiz',
       customerDocument: '20123456',
       customerPhone: '+584141234567',
+      customerAddress: 'Av. Bolívar, Edif. Sol, Piso 2',
       paymentMethod: PhysicalPaymentMethod.pagoMovil.label,
       paymentDetails: 'Ref: 849201',
     );
     expect(posOrder.channel, 'Tienda física');
     expect(posOrder.customerPhone, '+584141234567');
+    expect(posOrder.address, 'Av. Bolívar, Edif. Sol, Piso 2');
     expect(posOrder.discount, closeTo((45 + 48 + 50) * 0.05, 0.01));
     expect(nikeBlack.stockForColor('Negro'), 8);
     expect(nikeBlack.stockForColor('Blanco'), 6); // no tocó el stock blanco
@@ -159,12 +163,42 @@ void main() {
     expect(find.text('Transferencia bancaria'), findsNothing);
 
     expect(find.text('Datos del cliente'), findsOneWidget);
-    expect(find.text('Nombre y apellido'), findsOneWidget);
+    expect(find.text('Nombre completo y apellido'), findsOneWidget);
     expect(find.text('Cédula'), findsOneWidget);
     expect(find.text('Teléfono'), findsOneWidget);
+    expect(find.text('Dirección'), findsOneWidget);
     expect(find.text('Pago Móvil'), findsOneWidget);
     expect(find.text('Zelle'), findsOneWidget);
     expect(find.text('Efectivo Dólares (\$)'), findsOneWidget);
     expect(find.text('Efectivo Bolívares (Bs)'), findsOneWidget);
+  });
+
+  testWidgets('Categorías laterales se resaltan en rosado al pasar el mouse', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final state = AppState();
+    await tester.runAsync(() => state.load());
+
+    await tester.pumpWidget(
+      AppScope(
+        state: state,
+        child: const MaterialApp(home: HomeScreen()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byIcon(Icons.chevron_right), findsNothing);
+
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+
+    await gesture.moveTo(tester.getCenter(find.text('Casual').first));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.byIcon(Icons.chevron_right), findsOneWidget);
   });
 }

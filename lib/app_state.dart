@@ -383,6 +383,7 @@ class AppState extends ChangeNotifier {
     required String customerName,
     String customerDocument = '',
     String customerPhone = '',
+    String customerAddress = 'Retiro en tienda',
     required String paymentMethod,
     String paymentDetails = '',
   }) async {
@@ -403,7 +404,7 @@ class AppState extends ChangeNotifier {
       customerDocument: customerDocument.trim(),
       country: 'Tienda física',
       city: 'Tienda física',
-      address: 'Retiro en tienda',
+      address: customerAddress.trim().isEmpty ? 'Retiro en tienda' : customerAddress.trim(),
       postalCode: '-',
       paymentMethod: paymentMethod,
       paymentDetails: paymentDetails,

@@ -2053,7 +2053,7 @@ class _OrdersTabState extends State<_OrdersTab> {
                                 if (o.customerPhone.isNotEmpty) 'Tel: ${o.customerPhone}',
                               ].join(' • '),
                             o.isPhysical
-                                ? 'Canal: Tienda física (Atendió: ${o.cashierName})'
+                                ? 'Canal: Tienda física (Atendió: ${o.cashierName})${o.address.isNotEmpty && o.address != 'Retiro en tienda' ? '\nDirección: ${o.address}' : ''}'
                                 : 'Envío: ${o.address}, ${o.city}, ${o.country} (CP ${o.postalCode})',
                             if (o.paymentDetails.isNotEmpty) 'Detalle de pago: ${o.paymentDetails}',
                             'Ganancia estimada en esta venta: ${usd(o.estimatedProfit)}',

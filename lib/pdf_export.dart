@@ -261,7 +261,10 @@ class PdfExporter {
         pw.Text('Cliente: ${o.customerName}${o.customerEmail.isNotEmpty ? ' (${o.customerEmail})' : ''}'),
         if (o.customerDocument.isNotEmpty) pw.Text('Cédula: ${o.customerDocument}'),
         if (o.customerPhone.isNotEmpty) pw.Text('Teléfono: ${o.customerPhone}'),
-        if (!o.isPhysical) pw.Text('Dirección: ${o.address}, ${o.city}, ${o.country} - CP ${o.postalCode}'),
+        if (!o.isPhysical)
+          pw.Text('Dirección: ${o.address}, ${o.city}, ${o.country} - CP ${o.postalCode}')
+        else if (o.address.isNotEmpty && o.address != 'Retiro en tienda')
+          pw.Text('Dirección: ${o.address}'),
         if (o.cashierName.isNotEmpty && o.isPhysical) pw.Text('Atendido por: ${o.cashierName}'),
         pw.Text('Método de pago: ${o.paymentMethod}${o.paymentDetails.isNotEmpty ? ' (${o.paymentDetails})' : ''}'),
         pw.SizedBox(height: 16),

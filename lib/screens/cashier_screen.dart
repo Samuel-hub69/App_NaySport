@@ -85,6 +85,7 @@ class _CashierPosViewState extends State<CashierPosView> {
   final _custName = TextEditingController();
   final _custDoc = TextEditingController();
   final _custPhone = TextEditingController();
+  final _custAddress = TextEditingController();
 
   PhysicalPaymentMethod _method = PhysicalPaymentMethod.pagoMovil;
   final _payForm = GlobalKey<FormState>();
@@ -96,6 +97,7 @@ class _CashierPosViewState extends State<CashierPosView> {
     _custName.dispose();
     _custDoc.dispose();
     _custPhone.dispose();
+    _custAddress.dispose();
     _refCtrl.dispose();
     _zelleCtrl.dispose();
     super.dispose();
@@ -155,7 +157,7 @@ class _CashierPosViewState extends State<CashierPosView> {
     final custOk = _custForm.currentState?.validate() ?? false;
     final payOk = _payForm.currentState?.validate() ?? true;
     if (!custOk) {
-      showSnack(context, 'Completa los datos del cliente (Nombre, Cédula y Teléfono)', error: true);
+      showSnack(context, 'Completa los datos del cliente (Nombre, Cédula, Teléfono y Dirección)', error: true);
       return;
     }
     if (!payOk) {
@@ -177,6 +179,7 @@ class _CashierPosViewState extends State<CashierPosView> {
       customerName: _custName.text.trim(),
       customerDocument: _custDoc.text.trim(),
       customerPhone: _custPhone.text.trim(),
+      customerAddress: _custAddress.text.trim(),
       paymentMethod: _method.label,
       paymentDetails: _paymentDetail,
     );
@@ -187,6 +190,7 @@ class _CashierPosViewState extends State<CashierPosView> {
       _custName.clear();
       _custDoc.clear();
       _custPhone.clear();
+      _custAddress.clear();
       _refCtrl.clear();
       _zelleCtrl.clear();
     });
@@ -371,7 +375,7 @@ class _CashierPosViewState extends State<CashierPosView> {
                 ),
             ]),
             const Divider(),
-            // Datos del cliente físico (obligatorios para respaldo de la compra)
+            // Datos del cliente físico (obligatorios para registro de la compra)
             const Text('Datos del cliente', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Form(
@@ -380,7 +384,7 @@ class _CashierPosViewState extends State<CashierPosView> {
                 TextFormField(
                   controller: _custName,
                   inputFormatters: [nameInputFormatter],
-                  decoration: const InputDecoration(labelText: 'Nombre y apellido', isDense: true),
+                  decoration: const InputDecoration(labelText: 'Nombre completo y apellido', isDense: true),
                   validator: validateFullName,
                 ),
                 const SizedBox(height: 8),
@@ -405,6 +409,12 @@ class _CashierPosViewState extends State<CashierPosView> {
                     ),
                   ),
                 ]),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _custAddress,
+                  decoration: const InputDecoration(labelText: 'Dirección', isDense: true),
+                  validator: (v) => (v ?? '').trim().length >= 5 ? null : 'Ingresa la dirección',
+                ),
               ]),
             ),
             const SizedBox(height: 12),
@@ -803,6 +813,21 @@ class _CashierTodayView extends StatelessWidget {
               childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
               children: [
                 const Divider(),
+                if ([o.customerDocument, o.customerPhone, o.address].any((s) => s.isNotEmpty && s != 'Retiro en tienda'))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        [
+                          if (o.customerDocument.isNotEmpty) 'CI: ${o.customerDocument}',
+                          if (o.customerPhone.isNotEmpty) 'Tel: ${o.customerPhone}',
+                          if (o.address.isNotEmpty && o.address != 'Retiro en tienda') 'Dir: ${o.address}',
+                        ].join(' • '),
+                        style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                      ),
+                    ),
+                  ),
                 for (final l in o.lines)
                   Row(children: [
                     Expanded(child: Text('${l.qty}× ${l.productName}${l.variant.isNotEmpty ? ' (${l.variant})' : ''}')),

@@ -46,8 +46,8 @@ Al iniciar sesión con una cuenta de Cajero:
     tallas; muestra el stock exacto de cada color).
   * Si el cliente lleva 3 o más artículos en su compra (incluso modelos o
     zapatos distintos), aplica el descuento automático configurado por el Admin.
-  * Siempre se solicitan los datos del cliente (Nombre y apellido, Cédula y
-    Teléfono) para mantener el respaldo de quién realizó la compra.
+  * Siempre se solicitan los datos del cliente (Nombre completo y apellido,
+    Cédula, Teléfono y Dirección) para mantener el registro de la compra.
   * Métodos de pago físicos: Pago Móvil (con N° de referencia), Zelle,
     Efectivo ($) y Efectivo (Bs). Muestra el total en $ y en Bs.
   * Al darle a "Cobrar y registrar venta", descuenta el stock por color, registra

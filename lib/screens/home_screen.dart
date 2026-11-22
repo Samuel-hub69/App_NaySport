@@ -196,20 +196,6 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget tile(String label, IconData icon, String? id) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-        child: ListTile(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          selected: selected == id,
-          selectedTileColor: NayColors.primary.withValues(alpha: 0.1),
-          leading: Icon(icon),
-          title: Text(label),
-          onTap: () => onSelect(id),
-        ),
-      );
-    }
-
     return Container(
       width: 230,
       color: Colors.white,
@@ -220,9 +206,107 @@ class _Sidebar extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(28, 0, 0, 8),
             child: Text('CATEGORÍAS', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
           ),
-          tile('Todo', Icons.apps, null),
-          for (final c in categories) tile(c.name, c.icon, c.id),
+          _CategorySidebarItem(
+            label: 'Todo',
+            icon: Icons.apps,
+            selected: selected == null,
+            onTap: () => onSelect(null),
+          ),
+          for (final c in categories)
+            _CategorySidebarItem(
+              label: c.name,
+              icon: c.icon,
+              selected: selected == c.id,
+              onTap: () => onSelect(c.id),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _CategorySidebarItem extends StatefulWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CategorySidebarItem({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  State<_CategorySidebarItem> createState() => _CategorySidebarItemState();
+}
+
+class _CategorySidebarItemState extends State<_CategorySidebarItem> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.selected;
+    final hovered = _hovered;
+    final fgColor = hovered ? Colors.white : (active ? NayColors.primary : Colors.grey.shade800);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            hoverColor: Colors.transparent,
+            splashColor: NayColors.primary.withValues(alpha: 0.2),
+            onTap: widget.onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.symmetric(horizontal: hovered ? 16 : 14, vertical: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: hovered
+                    ? const LinearGradient(colors: [NayColors.primary, Color(0xFFFF7EB6)])
+                    : null,
+                color: hovered ? null : (active ? NayColors.logoBg : Colors.transparent),
+                border: Border.all(
+                  color: hovered
+                      ? NayColors.primary
+                      : (active ? NayColors.primary.withValues(alpha: 0.45) : Colors.transparent),
+                ),
+                boxShadow: hovered
+                    ? [
+                        BoxShadow(
+                          color: NayColors.primary.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(children: [
+                Icon(widget.icon, size: 20, color: fgColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    style: TextStyle(
+                      color: hovered ? Colors.white : (active ? NayColors.dark : Colors.grey.shade800),
+                      fontWeight: (hovered || active) ? FontWeight.bold : FontWeight.w500,
+                      fontSize: 14.5,
+                    ),
+                  ),
+                ),
+                if (hovered) const Icon(Icons.chevron_right, size: 18, color: Colors.white),
+              ]),
+            ),
+          ),
+        ),
       ),
     );
   }
