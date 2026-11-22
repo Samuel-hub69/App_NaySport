@@ -36,7 +36,7 @@ List<Product> seedProducts() => [
       Product(id: 'f1', name: 'Perfume Rose Gold', description: 'Fragancia floral 100 ml.', price: 64.90, categoryId: 'perfumes', image: _img('perfume', 51), stock: 12),
       Product(id: 'f2', name: 'Eau de Parfum Noir', description: 'Notas amaderadas y vainilla 80 ml.', price: 79.90, categoryId: 'perfumes', image: _img('perfume,bottle', 52), stock: 10),
       Product(id: 'f3', name: 'Body Mist Fresh', description: 'Bruma corporal cítrica 250 ml.', price: 22.90, categoryId: 'perfumes', image: _img('fragrance', 53), stock: 35),
-      Product(id: 'a1', name: 'Bolso de Mano', description: 'Bolso de cuero sintético con correa.', price: 54.90, categoryId: 'accesorios', image: _img('handbag', 61), colors: ['Negro', 'Rosado', 'Beige'], stock: 11),
+      Product(id: 'a1', name: 'Bolso de Mano', description: 'Bolso de cuero sintético con correa.', price: 54.90, categoryId: 'accesorios', image: '', colors: ['Negro', 'Rosado', 'Beige'], stock: 11),
       Product(id: 'a2', name: 'Gafas de Sol', description: 'Protección UV400.', price: 27.90, categoryId: 'accesorios', image: _img('sunglasses', 62), colors: ['Negro', 'Marrón'], stock: 22),
       Product(id: 'a3', name: 'Collar Dorado', description: 'Collar con baño de oro.', price: 32.90, categoryId: 'accesorios', image: _img('necklace,jewelry', 63), colors: ['Dorado', 'Plateado'], stock: 4),
       Product(id: 'a4', name: 'Reloj Minimal', description: 'Reloj análogo de diseño minimalista.', price: 89.90, categoryId: 'accesorios', image: _img('watch,women', 64), colors: ['Dorado', 'Plateado', 'Negro'], stock: 9),

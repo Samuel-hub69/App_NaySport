@@ -44,6 +44,9 @@ class AppState extends ChangeNotifier {
       purchases = (data['purchases'] as List? ?? []).map((e) => SupplierPurchase.fromJson(e)).toList();
       movements = (data['movements'] as List? ?? []).map((e) => StockMovement.fromJson(e)).toList();
       settings = Settings.fromJson(data['settings'] ?? {});
+      for (final p in products) {
+        if (p.id == 'a1' && p.image.contains('handbag?lock=61')) p.image = '';
+      }
     }
     if (!users.any((u) => u.isAdmin)) {
       users.add(StoredUser(
