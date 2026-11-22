@@ -36,6 +36,10 @@ void main() {
     await state.load();
 
     // Verificar rol Cajero predeterminado y métodos de pago físicos permitidos
+    expect(state.products.length, greaterThanOrEqualTo(30));
+    final jeansNegro = state.products.firstWhere((p) => p.id == 'r18');
+    expect(jeansNegro.stock, 12);
+    expect(jeansNegro.costPrice, jeansNegro.price - 5);
     expect(state.loginWithEmail(kDefaultCashierEmail, kDefaultCashierPassword), isNull);
     expect(state.isCashier, isTrue);
     expect(state.isAdmin, isFalse);
