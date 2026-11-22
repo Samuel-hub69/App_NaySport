@@ -67,8 +67,9 @@ void main() {
     expect(validatePhone('0414-abc'), isNotNull);
 
     // Ajuste masivo de precios (+10%)
+    final casualCount = state.products.where((p) => p.categoryId == 'casual').length;
     final updated = await state.adjustPrices(10, categoryId: 'casual');
-    expect(updated, 4);
+    expect(updated, casualCount);
     expect(shirt.price, closeTo(initialPrice * 1.10, 0.01));
 
     // No permitir agregar más del stock disponible

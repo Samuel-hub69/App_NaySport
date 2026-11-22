@@ -47,6 +47,12 @@ class AppState extends ChangeNotifier {
       for (final p in products) {
         if (p.id == 'a1' && p.image.contains('handbag?lock=61')) p.image = '';
       }
+      final dbVersion = (data['version'] as num?)?.toInt() ?? 1;
+      if (dbVersion < 4) {
+        for (final sp in seedProducts().where((p) => p.id.startsWith('r')).toList().reversed) {
+          if (!products.any((p) => p.id == sp.id)) products.insert(0, sp);
+        }
+      }
     }
     if (!users.any((u) => u.isAdmin)) {
       users.add(StoredUser(
@@ -62,7 +68,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> save() => LocalDb.write({
-        'version': 3,
+        'version': 4,
         'categories': categories.map((e) => e.toJson()).toList(),
         'products': products.map((e) => e.toJson()).toList(),
         'orders': orders.map((e) => e.toJson()).toList(),

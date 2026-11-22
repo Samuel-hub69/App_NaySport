@@ -57,6 +57,7 @@ dev_dependencies:
 flutter:
   assets:
     - assets/
+    - assets/products/
     - assets/fonts/Roboto-Regular.ttf
     - assets/fonts/Roboto-Bold.ttf
   fonts:

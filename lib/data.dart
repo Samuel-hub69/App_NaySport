@@ -4,6 +4,7 @@ String _img(String tags, int lock) => 'https://loremflickr.com/600/700/$tags?loc
 
 const _clothSizes = ['XS', 'S', 'M', 'L', 'XL'];
 const _shoeSizes = ['35', '36', '37', '38', '39', '40'];
+const _sneakerSizes = ['36', '37', '38', '39', '40', '41', '42'];
 
 /// Categorías iniciales (el admin puede agregar más).
 List<CategoryModel> seedCategories() => [
@@ -15,8 +16,83 @@ List<CategoryModel> seedCategories() => [
       CategoryModel(id: 'accesorios', name: 'Accesorios', iconKey: 'accesorios'),
     ];
 
-/// Catálogo inicial de prueba (luego se reemplaza por las fotos reales).
+/// Productos con fotos reales integradas en assets/products/ más el catálogo base.
 List<Product> seedProducts() => [
+      Product(
+        id: 'r1',
+        name: 'Zapatos Nike Deportivos Black',
+        description: 'Zapatillas deportivas tipo Nike Triple A en malla negra transpirable con suela blanca cosida y antideslizante.',
+        price: 45.00,
+        categoryId: 'calzado',
+        image: 'assets/products/nike_negro.jpg',
+        sizes: _sneakerSizes,
+        colors: ['Negro', 'Blanco'],
+        stock: 15,
+      ),
+      Product(
+        id: 'r2',
+        name: 'Top Manga Larga Lunares & Print',
+        description: 'Top ajustado de manga larga, cuello alto con detalles tipo alamar al frente y franjas en las mangas.',
+        price: 24.00,
+        categoryId: 'casual',
+        image: 'assets/products/top_lunares.jpg',
+        sizes: _clothSizes,
+        colors: ['Negro', 'Azul marino', 'Blanco', 'Beige', 'Estampado'],
+        stock: 20,
+      ),
+      Product(
+        id: 'r3',
+        name: 'Zapatos Nike Air Max Blancos',
+        description: 'Zapatillas Nike Air Max Triple A en color blanco con swoosh negro y cámara de aire roja visible en el talón.',
+        price: 48.00,
+        categoryId: 'calzado',
+        image: 'assets/products/nike_air_blanco.jpg',
+        sizes: _sneakerSizes,
+        colors: ['Blanco', 'Negro', 'Rojo'],
+        stock: 15,
+      ),
+      Product(
+        id: 'r4',
+        name: 'Zapatos Adidas Terrex Trail',
+        description: 'Zapatillas deportivas Adidas Terrex en gris y negro con franjas blancas, detalle naranja y suela todo terreno.',
+        price: 50.00,
+        categoryId: 'calzado',
+        image: 'assets/products/adidas_terrex.jpg',
+        sizes: _sneakerSizes,
+        colors: ['Gris', 'Negro', 'Blanco', 'Naranja'],
+        stock: 14,
+      ),
+      Product(
+        id: 'r5',
+        name: 'Riñonera Rosada Cadena Dorada',
+        description: 'Bolso cruzado tipo riñonera en tono rosado monogram con cadena dorada frontal y correa ancha estampada.',
+        price: 22.00,
+        categoryId: 'accesorios',
+        image: 'assets/products/rinonera_rosada.jpg',
+        colors: ['Rosado', 'Dorado'],
+        stock: 12,
+      ),
+      Product(
+        id: 'r6',
+        name: 'Vestido Largo Animal Print',
+        description: 'Vestido entallado largo de leopardo, disponible en corte clásico con encaje negro o diseño asimétrico.',
+        price: 32.00,
+        categoryId: 'prendas',
+        image: 'assets/products/vestido_animal_print.jpg',
+        sizes: _clothSizes,
+        colors: ['Estampado', 'Marrón', 'Negro'],
+        stock: 12,
+      ),
+      Product(
+        id: 'r7',
+        name: 'Cartera Coach Blanca Besos',
+        description: 'Mini cartera estructurada blanca con estampado de labios rojos, monedero colgante a juego y correa ajustable.',
+        price: 28.00,
+        categoryId: 'accesorios',
+        image: 'assets/products/cartera_coach_besos.jpg',
+        colors: ['Blanco', 'Rojo'],
+        stock: 10,
+      ),
       Product(id: 'c1', name: 'Blusa Casual Lino', description: 'Blusa fresca de lino, ideal para el día a día.', price: 29.90, categoryId: 'casual', image: _img('blouse,woman', 11), sizes: _clothSizes, colors: ['Blanco', 'Beige', 'Rosado'], stock: 25),
       Product(id: 'c2', name: 'Jean Mom Fit', description: 'Jean tiro alto de mezclilla suave.', price: 44.50, categoryId: 'casual', image: _img('jeans,woman', 12), sizes: _clothSizes, colors: ['Azul', 'Celeste', 'Negro'], stock: 18),
       Product(id: 'c3', name: 'Vestido Floral', description: 'Vestido ligero con estampado floral.', price: 39.99, categoryId: 'casual', image: _img('dress,woman', 13), sizes: _clothSizes, colors: ['Estampado', 'Lila'], stock: 12),
