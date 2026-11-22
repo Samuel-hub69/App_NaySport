@@ -35,6 +35,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     setState(() => _status = 'Cargando base de datos...');
     await state.load();
     if (!mounted) return;
+    if (state.settings.autoSyncBcv) {
+      setState(() => _status = 'Actualizando tasa BCV...');
+      await state.syncBcvRate();
+      if (!mounted) return;
+    }
     await precacheImage(const AssetImage('assets/logo.png'), context);
     if (!mounted) return;
     setState(() => _status = 'Cargando catálogo...');

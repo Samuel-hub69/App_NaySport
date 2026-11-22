@@ -83,9 +83,9 @@ class PdfExporter {
         pw.SizedBox(height: 12),
         pw.Container(
           padding: const pw.EdgeInsets.all(10),
-          decoration: pw.BoxDecoration(
+          decoration: const pw.BoxDecoration(
             color: _pdfLightPink,
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+            borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
           ),
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceAround, children: [
             _kpi('Pedidos', '${orders.length}'),
@@ -102,8 +102,8 @@ class PdfExporter {
           pw.TableHelper.fromTextArray(
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9),
             headerDecoration: const pw.BoxDecoration(color: _pdfPink),
-            cellStyle: const pw.TextStyle(fontSize: 8.5),
-            cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+            cellStyle: const pw.TextStyle(fontSize: 8.2),
+            cellPadding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 5),
             oddRowDecoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFFFFF9FC)),
             headers: ['Pedido', 'Fecha', 'Cliente', 'Destino', 'Productos', 'Pago', 'Total USD', 'Total Bs'],
             data: [
@@ -111,12 +111,12 @@ class PdfExporter {
                 [
                   o.id,
                   fmtDate(o.date),
-                  '${o.customerName}\n${o.customerEmail}',
+                  '${o.customerName}\n${o.customerEmail}${o.customerPhone.isNotEmpty ? '\n${o.customerPhone}' : ''}',
                   '${o.city}, ${o.country}\nCP ${o.postalCode}',
                   o.lines
                       .map((l) => '${l.qty}x ${l.productName}${l.variant.isNotEmpty ? ' (${l.variant})' : ''}')
                       .join('\n'),
-                  o.paymentMethod,
+                  o.paymentDetails.isNotEmpty ? '${o.paymentMethod}\n${o.paymentDetails}' : o.paymentMethod,
                   usd(o.total),
                   bs(o.total, o.exchangeRate > 0 ? o.exchangeRate : currentRate),
                 ],
@@ -134,9 +134,10 @@ class PdfExporter {
     final rate = state.settings.exchangeRate;
     final totalUnits = state.products.fold(0, (s, p) => s + p.stock);
     final totalValue = state.products.fold(0.0, (s, p) => s + p.stock * p.price);
+    final totalCost = state.products.fold(0.0, (s, p) => s + p.stock * p.costPrice);
 
     doc.addPage(pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
+      pageFormat: PdfPageFormat.a4.landscape,
       margin: const pw.EdgeInsets.all(24),
       header: (_) => _header(logo, 'Reporte de Inventario y Precios', 'Tasa: ${rate.toStringAsFixed(2)} Bs/\$'),
       footer: (ctx) => pw.Align(
@@ -148,15 +149,16 @@ class PdfExporter {
         pw.SizedBox(height: 12),
         pw.Container(
           padding: const pw.EdgeInsets.all(10),
-          decoration: pw.BoxDecoration(
+          decoration: const pw.BoxDecoration(
             color: _pdfLightPink,
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+            borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
           ),
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceAround, children: [
             _kpi('Productos', '${state.products.length}'),
             _kpi('Unidades en stock', '$totalUnits'),
-            _kpi('Valor inventario (USD)', usd(totalValue)),
-            _kpi('Valor (Bs)', bs(totalValue, rate)),
+            _kpi('Costo invertido', usd(totalCost)),
+            _kpi('Valor venta (USD)', usd(totalValue)),
+            _kpi('Valor venta (Bs)', bs(totalValue, rate)),
           ]),
         ),
         pw.SizedBox(height: 14),
@@ -165,7 +167,7 @@ class PdfExporter {
           headerDecoration: const pw.BoxDecoration(color: _pdfPink),
           cellStyle: const pw.TextStyle(fontSize: 8.5),
           cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-          headers: ['Producto', 'Categoría', 'Colores', 'Tallas', 'Precio \$', 'Precio Bs', 'Stock', 'Estado'],
+          headers: ['Producto', 'Categoría', 'Colores', 'Tallas', 'Costo \$', 'Venta \$', 'Venta Bs', 'Stock', 'Estado'],
           data: [
             for (final p in state.products)
               [
@@ -173,6 +175,7 @@ class PdfExporter {
                 state.categoryName(p.categoryId),
                 p.colors.isEmpty ? '-' : p.colors.join(', '),
                 p.sizes.isEmpty ? '-' : p.sizes.join(', '),
+                p.costPrice > 0 ? usd(p.costPrice) : '-',
                 usd(p.price),
                 bs(p.price, rate),
                 '${p.stock}',
@@ -185,7 +188,65 @@ class PdfExporter {
     return doc.save();
   }
 
-  /// Genera el recibo PDF de un pedido puntual.
+  /// Genera el PDF de compras a proveedores / entradas de mercancía.
+  static Future<Uint8List> buildPurchasesPdf(List<SupplierPurchase> purchases, double rate) async {
+    final doc = await _createDoc();
+    final logo = await _loadLogo();
+    final totalUsd = purchases.fold(0.0, (s, p) => s + p.totalCost);
+    final totalUnits = purchases.fold(0, (s, p) => s + p.totalUnits);
+
+    doc.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4.landscape,
+      margin: const pw.EdgeInsets.all(24),
+      header: (_) => _header(logo, 'Compras y Entradas de Proveedores', 'Tasa ref: ${rate.toStringAsFixed(2)} Bs/\$'),
+      footer: (ctx) => pw.Align(
+        alignment: pw.Alignment.centerRight,
+        child: pw.Text('Página ${ctx.pageNumber} de ${ctx.pagesCount}',
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+      ),
+      build: (_) => [
+        pw.SizedBox(height: 12),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(10),
+          decoration: const pw.BoxDecoration(
+            color: _pdfLightPink,
+            borderRadius: pw.BorderRadius.all(pw.Radius.circular(6)),
+          ),
+          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceAround, children: [
+            _kpi('Entradas registradas', '${purchases.length}'),
+            _kpi('Unidades ingresadas', '$totalUnits'),
+            _kpi('Inversión total (USD)', usd(totalUsd)),
+            _kpi('Equivalente (Bs)', bs(totalUsd, rate)),
+          ]),
+        ),
+        pw.SizedBox(height: 14),
+        pw.TableHelper.fromTextArray(
+          headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9),
+          headerDecoration: const pw.BoxDecoration(color: _pdfPink),
+          cellStyle: const pw.TextStyle(fontSize: 8.5),
+          cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+          headers: ['Compra', 'Fecha', 'Proveedor', 'Factura / Guía', 'Mercancía recibida', 'Estado', 'Total USD'],
+          data: [
+            for (final c in purchases)
+              [
+                c.id,
+                fmtDate(c.date),
+                c.supplierName,
+                c.invoiceRef.isEmpty ? '-' : c.invoiceRef,
+                c.lines
+                    .map((l) => '${l.qty}x ${l.productName} (${usd(l.unitCost)} c/u)${l.note != null && l.note!.isNotEmpty ? ' [${l.note}]' : ''}')
+                    .join('\n'),
+                c.paid ? 'Pagada' : 'Pendiente',
+                usd(c.totalCost),
+              ],
+          ],
+        ),
+      ],
+    ));
+    return doc.save();
+  }
+
+  /// Genera el recibo PDF de un pedido puntual (solo uso del Admin).
   static Future<Uint8List> buildReceiptPdf(Order o) async {
     final doc = await _createDoc();
     final logo = await _loadLogo();
@@ -196,8 +257,9 @@ class PdfExporter {
         _header(logo, 'Comprobante de Pedido ${o.id}', fmtDate(o.date)),
         pw.SizedBox(height: 16),
         pw.Text('Cliente: ${o.customerName} (${o.customerEmail})'),
+        if (o.customerPhone.isNotEmpty) pw.Text('Teléfono: ${o.customerPhone}'),
         pw.Text('Dirección: ${o.address}, ${o.city}, ${o.country} - CP ${o.postalCode}'),
-        pw.Text('Método de pago: ${o.paymentMethod}'),
+        pw.Text('Método de pago: ${o.paymentMethod}${o.paymentDetails.isNotEmpty ? ' (${o.paymentDetails})' : ''}'),
         pw.SizedBox(height: 16),
         pw.TableHelper.fromTextArray(
           headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 10),

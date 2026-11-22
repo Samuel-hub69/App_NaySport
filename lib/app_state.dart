@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'bcv_service.dart';
 import 'data.dart';
 import 'db.dart';
 import 'models.dart';
@@ -13,6 +14,9 @@ class AppState extends ChangeNotifier {
   List<Product> products = [];
   List<Order> orders = [];
   List<StoredUser> users = [];
+  List<Supplier> suppliers = [];
+  List<SupplierPurchase> purchases = [];
+  List<StockMovement> movements = [];
   Settings settings = Settings();
 
   final List<CartItem> _items = [];
@@ -28,11 +32,17 @@ class AppState extends ChangeNotifier {
       settings = Settings();
       orders = [];
       users = [];
+      suppliers = [];
+      purchases = [];
+      movements = [];
     } else {
       categories = (data['categories'] as List).map((e) => CategoryModel.fromJson(e)).toList();
       products = (data['products'] as List).map((e) => Product.fromJson(e)).toList();
       orders = (data['orders'] as List? ?? []).map((e) => Order.fromJson(e)).toList();
       users = (data['users'] as List? ?? []).map((e) => StoredUser.fromJson(e)).toList();
+      suppliers = (data['suppliers'] as List? ?? []).map((e) => Supplier.fromJson(e)).toList();
+      purchases = (data['purchases'] as List? ?? []).map((e) => SupplierPurchase.fromJson(e)).toList();
+      movements = (data['movements'] as List? ?? []).map((e) => StockMovement.fromJson(e)).toList();
       settings = Settings.fromJson(data['settings'] ?? {});
     }
     if (!users.any((u) => u.isAdmin)) {
@@ -49,22 +59,35 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> save() => LocalDb.write({
-        'version': 2,
+        'version': 3,
         'categories': categories.map((e) => e.toJson()).toList(),
         'products': products.map((e) => e.toJson()).toList(),
         'orders': orders.map((e) => e.toJson()).toList(),
         'users': users.map((e) => e.toJson()).toList(),
+        'suppliers': suppliers.map((e) => e.toJson()).toList(),
+        'purchases': purchases.map((e) => e.toJson()).toList(),
+        'movements': movements.map((e) => e.toJson()).toList(),
         'settings': settings.toJson(),
       });
 
-  /// Guarda y refresca la interfaz.
   Future<void> commit() async {
     notifyListeners();
     await save();
   }
 
-  // ---------------------------------------------------------------- catálogo
+  // ---------------------------------------------------------------- catálogo / colores
   List<Product> get activeProducts => products.where((p) => p.active).toList();
+
+  List<String> get allColorNames => {...kColorPalette.keys, ...settings.customColors.keys}.toList();
+
+  int colorHexFor(String name) => settings.customColors[name] ?? kColorPalette[name] ?? 0xFFCCCCCC;
+
+  Future<void> addCustomColor(String name, int colorValue) async {
+    final clean = name.trim();
+    if (clean.isEmpty) return;
+    settings.customColors[clean] = colorValue;
+    await commit();
+  }
 
   CategoryModel? categoryById(String id) {
     for (final c in categories) {
@@ -83,8 +106,23 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
+  // ---------------------------------------------------------------- BCV API
+  /// Sincroniza la tasa de cambio desde ve.dolarapi.com ('BCV Oficial' o 'Paralelo').
+  /// Si no hay internet o falla, conserva la última tasa guardada y devuelve false.
+  Future<bool> syncBcvRate({String? source}) async {
+    final targetSource = source ?? (settings.rateSource == 'Paralelo' ? 'Paralelo' : 'BCV Oficial');
+    final rates = await BcvService.fetch(timeout: const Duration(seconds: 3));
+    if (rates == null) return false;
+    final val = targetSource == 'Paralelo' ? (rates.paralelo ?? rates.oficial) : (rates.oficial ?? rates.paralelo);
+    if (val == null || val <= 0) return false;
+    settings.exchangeRate = val;
+    settings.rateSource = targetSource;
+    settings.lastRateUpdate = rates.fetchedAt;
+    await commit();
+    return true;
+  }
+
   // ---------------------------------------------------------------- descuentos
-  /// Descuento (%) que corresponde a una cantidad.
   double discountFor(int qty) {
     double best = 0;
     for (final r in settings.discounts) {
@@ -93,7 +131,6 @@ class AppState extends ChangeNotifier {
     return best;
   }
 
-  /// Unidades de un producto en el carrito (sumando todos sus colores/tallas).
   int qtyInCart(String productId) =>
       _items.where((i) => i.product.id == productId).fold(0, (s, i) => s + i.quantity);
 
@@ -112,7 +149,6 @@ class AppState extends ChangeNotifier {
 
   int availableFor(Product p) => p.stock - qtyInCart(p.id);
 
-  /// Agrega al carrito. Devuelve false si no hay stock suficiente.
   bool add(Product p, {String? size, String? color, int qty = 1}) {
     if (availableFor(p) < qty) return false;
     final existing = _items.where((i) => i.product.id == p.id && i.size == size && i.color == color);
@@ -148,24 +184,93 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Registra la venta, descuenta el stock y vacía el carrito.
+  // ---------------------------------------------------------------- inventario / movimientos
+  void _logMovement(Product p, String type, int delta, String reason) {
+    if (delta == 0) return;
+    movements.insert(
+      0,
+      StockMovement(
+        id: newId('mov_'),
+        date: DateTime.now(),
+        productId: p.id,
+        productName: p.name,
+        type: type,
+        delta: delta,
+        stockAfter: p.stock,
+        reason: reason,
+      ),
+    );
+  }
+
+  Future<void> adjustStock(Product p, int newStock, {String reason = 'Ajuste manual'}) async {
+    final clean = newStock < 0 ? 0 : newStock;
+    final delta = clean - p.stock;
+    if (delta == 0) return;
+    p.stock = clean;
+    _logMovement(p, delta > 0 ? 'entrada' : 'ajuste', delta, reason);
+    await commit();
+  }
+
+  /// Registra una llegada de mercancía de proveedor y suma el stock automático.
+  Future<SupplierPurchase> recordSupplierPurchase({
+    required Supplier supplier,
+    required String invoiceRef,
+    required bool paid,
+    required String notes,
+    required List<PurchaseLine> lines,
+  }) async {
+    final totalCost = lines.fold(0.0, (s, l) => s + l.total);
+    final purchase = SupplierPurchase(
+      id: 'CMP-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
+      date: DateTime.now(),
+      supplierId: supplier.id,
+      supplierName: supplier.name,
+      invoiceRef: invoiceRef,
+      paid: paid,
+      notes: notes,
+      lines: lines,
+      totalCost: totalCost,
+    );
+    for (final line in lines) {
+      final p = productById(line.productId);
+      if (p != null) {
+        p.stock += line.qty;
+        if (line.unitCost > 0) p.costPrice = line.unitCost;
+        _logMovement(
+          p,
+          'entrada',
+          line.qty,
+          'Proveedor: ${supplier.name}${invoiceRef.isNotEmpty ? ' (Fact. $invoiceRef)' : ''}',
+        );
+      }
+    }
+    purchases.insert(0, purchase);
+    await commit();
+    return purchase;
+  }
+
+  /// Registra la venta, descuenta el stock, guarda el movimiento y vacía el carrito.
   Future<Order> placeOrder({
+    required String customerPhone,
     required String country,
     required String city,
     required String address,
     required String postalCode,
     required String paymentMethod,
+    String paymentDetails = '',
   }) async {
     final order = Order(
       id: 'NS-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}',
       date: DateTime.now(),
       customerName: _user?.name ?? 'Invitado',
       customerEmail: _user?.email ?? '',
+      customerPhone: customerPhone,
       country: country,
       city: city,
       address: address,
       postalCode: postalCode,
       paymentMethod: paymentMethod,
+      paymentDetails: paymentDetails,
       lines: [
         for (final i in _items)
           OrderLine(
@@ -175,6 +280,7 @@ class AppState extends ChangeNotifier {
             color: i.color,
             qty: i.quantity,
             unitPrice: i.product.price,
+            unitCost: i.product.costPrice,
             discountPercent: discountPercentFor(i),
           ),
       ],
@@ -186,6 +292,7 @@ class AppState extends ChangeNotifier {
     );
     for (final i in _items) {
       i.product.stock = (i.product.stock - i.quantity).clamp(0, 1 << 30);
+      _logMovement(i.product, 'salida', -i.quantity, 'Venta ${order.id} (${order.customerName})');
     }
     orders.insert(0, order);
     _items.clear();
@@ -206,11 +313,10 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  /// Inicia sesión con correo. Devuelve un mensaje de error o null si todo bien.
   String? loginWithEmail(String email, String password) {
     final u = findUser(email);
     if (u == null || u.passwordHash != LocalDb.hash(password)) return 'Correo o contraseña incorrectos';
-    _user = AppUser(name: u.name, email: u.email, provider: 'email', isAdmin: u.isAdmin);
+    _user = AppUser(name: u.name, email: u.email, phone: u.phone, isAdmin: u.isAdmin);
     notifyListeners();
     return null;
   }
@@ -224,14 +330,9 @@ class AppState extends ChangeNotifier {
     if (findUser(email) != null) return 'Ese correo ya está registrado';
     final u = StoredUser(name: name, email: email.trim(), phone: phone, passwordHash: LocalDb.hash(password));
     users.add(u);
-    _user = AppUser(name: u.name, email: u.email, provider: 'email');
+    _user = AppUser(name: u.name, email: u.email, phone: u.phone);
     await commit();
     return null;
-  }
-
-  void loginFacebook() {
-    _user = const AppUser(name: 'Usuaria Facebook', email: 'usuario@facebook.com', provider: 'facebook');
-    notifyListeners();
   }
 
   void logout() {
@@ -240,7 +341,6 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------- admin
-  /// Cambia precios en [percent]% (ej. 10 = +10%, -5 = -5%). Si [categoryId] es null, a todos.
   Future<int> adjustPrices(double percent, {String? categoryId}) async {
     var n = 0;
     for (final p in products) {
@@ -255,6 +355,11 @@ class AppState extends ChangeNotifier {
 
   Future<void> clearOrders() async {
     orders.clear();
+    await commit();
+  }
+
+  Future<void> clearMovements() async {
+    movements.clear();
     await commit();
   }
 
@@ -281,7 +386,6 @@ class AppScope extends InheritedNotifier<AppState> {
   static AppState of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppScope>()!.notifier!;
 
-  /// Para usar dentro de callbacks (sin suscribirse a cambios).
   static AppState read(BuildContext context) =>
       context.getInheritedWidgetOfExactType<AppScope>()!.notifier!;
 }

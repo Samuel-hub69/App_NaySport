@@ -20,26 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pop(context, true);
   }
 
-  Future<void> _facebook() async {
-    // Simulación del flujo OAuth de Facebook.
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const AlertDialog(
-        content: Row(children: [
-          CircularProgressIndicator(),
-          SizedBox(width: 20),
-          Text('Conectando con Facebook...'),
-        ]),
-      ),
-    );
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    Navigator.pop(context);
-    AppScope.read(context).loginFacebook();
-    _success();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -87,24 +67,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   const Center(child: NayLogo(size: 80)),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   Text(_registerMode ? 'Crear cuenta' : 'Iniciar sesión',
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 24),
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF1877F2)),
-                    icon: const Icon(Icons.facebook),
-                    label: const Text('Continuar con Facebook'),
-                    onPressed: _facebook,
+                  const SizedBox(height: 6),
+                  Text(
+                    _registerMode
+                        ? 'Completa tus datos para comprar en NaySport'
+                        : 'Ingresa con tu correo y contraseña',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey.shade600),
                   ),
-                  const SizedBox(height: 20),
-                  const Row(children: [
-                    Expanded(child: Divider()),
-                    Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('o con tu correo')),
-                    Expanded(child: Divider()),
-                  ]),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 250),
                     child: _registerMode
@@ -142,6 +117,13 @@ class _LoginFormState extends State<_LoginForm> {
   final _pass = TextEditingController();
   bool _obscure = true;
   String? _error;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _pass.dispose();
+    super.dispose();
+  }
 
   void _submit() {
     if (!_form.currentState!.validate()) return;
@@ -209,6 +191,16 @@ class _RegisterFormState extends State<_RegisterForm> {
   bool _terms = false;
   bool _obscure = true;
 
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _phone.dispose();
+    _pass.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
   String? _passValidator(String? v) {
     final p = v ?? '';
     if (p.length < 8) return 'Mínimo 8 caracteres';
@@ -233,22 +225,20 @@ class _RegisterFormState extends State<_RegisterForm> {
 
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
-    if (_birth == null) return _snack('Selecciona tu fecha de nacimiento');
+    if (_birth == null) return showSnack(context, 'Selecciona tu fecha de nacimiento', error: true);
     final age = DateTime.now().difference(_birth!).inDays ~/ 365;
-    if (age < 18) return _snack('Debes ser mayor de 18 años para comprar');
-    if (!_terms) return _snack('Debes aceptar los términos y condiciones');
+    if (age < 18) return showSnack(context, 'Debes ser mayor de 18 años para comprar', error: true);
+    if (!_terms) return showSnack(context, 'Debes aceptar los términos y condiciones', error: true);
     final err = await AppScope.read(context).register(
       name: _name.text.trim(),
       email: _email.text.trim(),
       phone: _phone.text.trim(),
       password: _pass.text,
     );
-    if (err != null) return _snack(err);
+    if (!mounted) return;
+    if (err != null) return showSnack(context, err, error: true);
     widget.onSuccess();
   }
-
-  void _snack(String m) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(m), behavior: SnackBarBehavior.floating, width: 400));
 
   @override
   Widget build(BuildContext context) {
@@ -270,8 +260,9 @@ class _RegisterFormState extends State<_RegisterForm> {
         const SizedBox(height: 14),
         TextFormField(
           controller: _phone,
-          decoration: const InputDecoration(labelText: 'Teléfono', prefixIcon: Icon(Icons.phone_outlined), hintText: '+591 70000000'),
-          validator: (v) => RegExp(r'^\+?[\d\s]{7,15}$').hasMatch(v ?? '') ? null : 'Teléfono no válido',
+          decoration: const InputDecoration(
+              labelText: 'Teléfono', prefixIcon: Icon(Icons.phone_outlined), hintText: '+58 414 0000000'),
+          validator: (v) => RegExp(r'^\+?[\d\s\-]{7,18}$').hasMatch(v ?? '') ? null : 'Teléfono no válido',
         ),
         const SizedBox(height: 14),
         OutlinedButton.icon(

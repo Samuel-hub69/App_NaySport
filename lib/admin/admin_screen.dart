@@ -34,8 +34,10 @@ class _AdminScreenState extends State<AdminScreen> {
             child: Chip(
               avatar: const Icon(Icons.currency_exchange, size: 18, color: NayColors.primary),
               backgroundColor: NayColors.logoBg,
-              label: Text('Tasa: ${state.settings.exchangeRate.toStringAsFixed(2)} Bs/\$',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              label: Text(
+                '${state.settings.rateSource}: ${state.settings.exchangeRate.toStringAsFixed(2)} Bs/\$',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
             ),
           ),
         ],
@@ -48,10 +50,12 @@ class _AdminScreenState extends State<AdminScreen> {
           onDestinationSelected: (i) => setState(() => _tab = i),
           destinations: const [
             NavigationRailDestination(icon: Icon(Icons.dashboard_outlined), label: Text('Resumen')),
-            NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), label: Text('Stock y Precios')),
+            NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), label: Text('Stock y Kardex')),
+            NavigationRailDestination(icon: Icon(Icons.local_shipping_outlined), label: Text('Proveedores')),
             NavigationRailDestination(icon: Icon(Icons.category_outlined), label: Text('Categorías')),
+            NavigationRailDestination(icon: Icon(Icons.people_outline), label: Text('Clientes')),
             NavigationRailDestination(icon: Icon(Icons.receipt_long_outlined), label: Text('Historial y PDF')),
-            NavigationRailDestination(icon: Icon(Icons.tune_outlined), label: Text('Configuración')),
+            NavigationRailDestination(icon: Icon(Icons.tune_outlined), label: Text('Config y BCV')),
           ],
         ),
         const VerticalDivider(width: 1),
@@ -59,7 +63,9 @@ class _AdminScreenState extends State<AdminScreen> {
           child: IndexedStack(index: _tab, children: [
             _DashboardTab(onGoTab: (i) => setState(() => _tab = i)),
             const _InventoryTab(),
+            const _SuppliersTab(),
             const _CategoriesTab(),
+            const _CustomersTab(),
             const _OrdersTab(),
             const _SettingsTab(),
           ]),
@@ -82,9 +88,14 @@ class _DashboardTab extends StatelessWidget {
     final rate = state.settings.exchangeRate;
     final totalSales = state.orders.fold(0.0, (s, o) => s + o.total);
     final totalUnits = state.orders.fold(0, (s, o) => s + o.units);
+    final totalProfit = state.orders.fold(
+      0.0,
+      (s, o) => s + o.lines.fold(0.0, (ls, l) => ls + l.estimatedProfit),
+    );
     final lowStock = state.products.where((p) => p.stock <= 5).toList()
       ..sort((a, b) => a.stock.compareTo(b.stock));
     final clients = state.users.where((u) => !u.isAdmin).length;
+    final pendingSuppliers = state.purchases.where((p) => !p.paid).length;
 
     return ListView(padding: const EdgeInsets.all(24), children: [
       const Text('Resumen de la tienda', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
@@ -98,6 +109,13 @@ class _DashboardTab extends StatelessWidget {
           color: Colors.green,
         ),
         _KpiCard(
+          title: 'Ganancia estimada',
+          value: usd(totalProfit),
+          sub: totalProfit > 0 ? bs(totalProfit, rate) : 'Asigna costo a tus prendas',
+          icon: Icons.trending_up,
+          color: Colors.teal,
+        ),
+        _KpiCard(
           title: 'Pedidos realizados',
           value: '${state.orders.length}',
           sub: '$totalUnits unidades vendidas',
@@ -105,18 +123,18 @@ class _DashboardTab extends StatelessWidget {
           color: NayColors.primary,
         ),
         _KpiCard(
-          title: 'Productos',
+          title: 'Productos activos',
           value: '${state.activeProducts.length} / ${state.products.length}',
-          sub: 'activos en tienda',
+          sub: '${lowStock.length} con stock bajo/agotado',
           icon: Icons.checkroom,
           color: Colors.purple,
         ),
         _KpiCard(
-          title: 'Stock bajo / agotado',
-          value: '${lowStock.length}',
-          sub: 'productos con ≤ 5 unid.',
-          icon: Icons.warning_amber_rounded,
-          color: lowStock.isEmpty ? Colors.teal : Colors.orange.shade800,
+          title: 'Proveedores',
+          value: '${state.suppliers.length}',
+          sub: pendingSuppliers > 0 ? '$pendingSuppliers factura(s) por pagar' : '${state.purchases.length} entradas',
+          icon: Icons.local_shipping_outlined,
+          color: Colors.indigo,
         ),
         _KpiCard(
           title: 'Clientes registrados',
@@ -167,8 +185,7 @@ class _DashboardTab extends StatelessWidget {
                         const SizedBox(width: 8),
                         OutlinedButton(
                           onPressed: () {
-                            p.stock += 10;
-                            state.commit();
+                            state.adjustStock(p, p.stock + 10, reason: 'Reposición rápida desde Resumen');
                             showSnack(context, '+10 unidades agregadas a ${p.name}');
                           },
                           child: const Text('+10'),
@@ -192,7 +209,7 @@ class _DashboardTab extends StatelessWidget {
                   const SizedBox(width: 8),
                   const Text('Últimas ventas', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                   const Spacer(),
-                  TextButton(onPressed: () => onGoTab(3), child: const Text('Ver historial')),
+                  TextButton(onPressed: () => onGoTab(5), child: const Text('Ver historial')),
                 ]),
                 const Divider(),
                 if (state.orders.isEmpty)
@@ -254,14 +271,14 @@ class _KpiCard extends StatelessWidget {
         const SizedBox(height: 12),
         Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 2),
-        Text(sub, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
       ]),
     );
   }
 }
 
 // ============================================================================
-// 2. STOCK, PRODUCTOS Y AJUSTE DE PRECIOS
+// 2. STOCK, PRECIOS Y KARDEX (MOVIMIENTOS)
 // ============================================================================
 class _InventoryTab extends StatefulWidget {
   const _InventoryTab();
@@ -271,6 +288,7 @@ class _InventoryTab extends StatefulWidget {
 }
 
 class _InventoryTabState extends State<_InventoryTab> {
+  bool _showMovements = false;
   String _query = '';
   String? _catFilter;
   String _stockFilter = 'all'; // all | low | out | hidden
@@ -278,6 +296,98 @@ class _InventoryTabState extends State<_InventoryTab> {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
+    return Column(children: [
+      Container(
+        color: Colors.white,
+        padding: const EdgeInsets.all(16),
+        child: Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: false, icon: Icon(Icons.inventory_2_outlined, size: 18), label: Text('Catálogo')),
+              ButtonSegment(value: true, icon: Icon(Icons.swap_vert, size: 18), label: Text('Movimientos (Kardex)')),
+            ],
+            selected: {_showMovements},
+            onSelectionChanged: (s) => setState(() => _showMovements = s.first),
+          ),
+          SizedBox(
+            width: 220,
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: _showMovements ? 'Buscar producto o motivo...' : 'Buscar prenda...',
+                prefixIcon: const Icon(Icons.search),
+                isDense: true,
+              ),
+              onChanged: (v) => setState(() => _query = v),
+            ),
+          ),
+          if (!_showMovements) ...[
+            SizedBox(
+              width: 180,
+              child: DropdownButtonFormField<String?>(
+                initialValue: _catFilter,
+                decoration: const InputDecoration(labelText: 'Categoría', isDense: true),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Todas')),
+                  for (final c in state.categories) DropdownMenuItem(value: c.id, child: Text(c.name)),
+                ],
+                onChanged: (v) => setState(() => _catFilter = v),
+              ),
+            ),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'all', label: Text('Todos')),
+                ButtonSegment(value: 'low', label: Text('Bajo')),
+                ButtonSegment(value: 'out', label: Text('Agotado')),
+                ButtonSegment(value: 'hidden', label: Text('Ocultos')),
+              ],
+              selected: {_stockFilter},
+              onSelectionChanged: (s) => setState(() => _stockFilter = s.first),
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Nuevo producto'),
+              onPressed: () => showDialog(context: context, builder: (_) => const _ProductEditorDialog()),
+            ),
+            FilledButton.tonalIcon(
+              icon: const Icon(Icons.trending_up),
+              label: const Text('Ajustar precios (%)'),
+              onPressed: () => _openBulkPriceDialog(context),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.picture_as_pdf),
+              label: const Text('Stock PDF'),
+              onPressed: () async {
+                final bytes = await PdfExporter.buildStockPdf(state);
+                final path = await PdfExporter.savePdf(bytes, 'Inventario_NaySport.pdf');
+                if (path != null && context.mounted) {
+                  showSnack(context, 'PDF guardado');
+                  WinUtils.open(path);
+                }
+              },
+            ),
+          ] else ...[
+            TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              icon: const Icon(Icons.delete_sweep_outlined),
+              label: const Text('Limpiar movimientos'),
+              onPressed: state.movements.isEmpty
+                  ? null
+                  : () async {
+                      final ok = await _confirmDialog(
+                          context, '¿Limpiar historial de movimientos?', 'No afectará el stock actual.');
+                      if (ok) await state.clearMovements();
+                    },
+            ),
+          ],
+        ]),
+      ),
+      Expanded(
+        child: _showMovements ? _movementsList(state) : _catalogList(state),
+      ),
+    ]);
+  }
+
+  Widget _catalogList(AppState state) {
     final list = state.products.where((p) {
       if (_catFilter != null && p.categoryId != _catFilter) return false;
       if (_query.isNotEmpty && !p.name.toLowerCase().contains(_query.toLowerCase())) return false;
@@ -293,169 +403,138 @@ class _InventoryTabState extends State<_InventoryTab> {
       }
     }).toList();
 
-    return Column(children: [
-      Container(
-        color: Colors.white,
-        padding: const EdgeInsets.all(16),
-        child: Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
-          SizedBox(
-            width: 240,
-            child: TextField(
-              decoration: const InputDecoration(hintText: 'Buscar prenda...', prefixIcon: Icon(Icons.search), isDense: true),
-              onChanged: (v) => setState(() => _query = v),
-            ),
-          ),
-          SizedBox(
-            width: 200,
-            child: DropdownButtonFormField<String?>(
-              initialValue: _catFilter,
-              decoration: const InputDecoration(labelText: 'Categoría', isDense: true),
-              items: [
-                const DropdownMenuItem(value: null, child: Text('Todas')),
-                for (final c in state.categories) DropdownMenuItem(value: c.id, child: Text(c.name)),
-              ],
-              onChanged: (v) => setState(() => _catFilter = v),
-            ),
-          ),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'all', label: Text('Todos')),
-              ButtonSegment(value: 'low', label: Text('Bajo')),
-              ButtonSegment(value: 'out', label: Text('Agotado')),
-              ButtonSegment(value: 'hidden', label: Text('Ocultos')),
-            ],
-            selected: {_stockFilter},
-            onSelectionChanged: (s) => setState(() => _stockFilter = s.first),
-          ),
-          FilledButton.icon(
-            icon: const Icon(Icons.add),
-            label: const Text('Nuevo producto'),
-            onPressed: () => _openProductDialog(context),
-          ),
-          FilledButton.tonalIcon(
-            icon: const Icon(Icons.trending_up),
-            label: const Text('Ajustar precios (%)'),
-            onPressed: () => _openBulkPriceDialog(context),
-          ),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.picture_as_pdf),
-            label: const Text('Stock PDF'),
-            onPressed: () async {
-              final bytes = await PdfExporter.buildStockPdf(state);
-              final path = await PdfExporter.savePdf(bytes, 'Inventario_NaySport.pdf');
-              if (path != null && context.mounted) {
-                showSnack(context, 'PDF guardado');
-                WinUtils.open(path);
-              }
-            },
-          ),
-        ]),
-      ),
-      Expanded(
-        child: list.isEmpty
-            ? const Center(child: Text('No hay productos con ese filtro'))
-            : ListView.separated(
-                padding: const EdgeInsets.all(20),
-                itemCount: list.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (_, i) {
-                  final p = list[i];
-                  return Card(
-                    elevation: 0,
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: SizedBox(
-                            width: 64,
-                            height: 64,
-                            child: ProductImage(p.image, fallbackIcon: state.categoryIcon(p.categoryId)),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          flex: 3,
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                            Text(state.categoryName(p.categoryId),
-                                style: const TextStyle(color: NayColors.primary, fontSize: 12)),
-                            if (p.colors.isNotEmpty || p.sizes.isNotEmpty)
-                              Text(
-                                [
-                                  if (p.colors.isNotEmpty) 'Colores: ${p.colors.join(', ')}',
-                                  if (p.sizes.isNotEmpty) 'Tallas: ${p.sizes.join(', ')}',
-                                ].join(' • '),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                              ),
-                          ]),
-                        ),
-                        SizedBox(width: 140, child: PriceText(p.price, fontSize: 15)),
-                        Row(children: [
-                          IconButton(
-                            icon: const Icon(Icons.remove_circle_outline),
-                            onPressed: p.stock > 0
-                                ? () {
-                                    p.stock--;
-                                    state.commit();
-                                  }
-                                : null,
-                          ),
-                          InkWell(
-                            onTap: () => _editStockQuick(context, p),
-                            child: Chip(
-                              backgroundColor: p.stock == 0
-                                  ? Colors.red.shade100
-                                  : (p.stock <= 5 ? Colors.orange.shade100 : Colors.green.shade100),
-                              label: Text('${p.stock} unid.', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.add_circle_outline),
-                            onPressed: () {
-                              p.stock++;
-                              state.commit();
-                            },
-                          ),
-                        ]),
-                        const SizedBox(width: 8),
-                        Tooltip(
-                          message: p.active ? 'Visible en la tienda' : 'Oculto',
-                          child: Switch(
-                            value: p.active,
-                            onChanged: (v) {
-                              p.active = v;
-                              state.commit();
-                            },
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Editar producto',
-                          icon: const Icon(Icons.edit_outlined),
-                          onPressed: () => _openProductDialog(context, product: p),
-                        ),
-                        IconButton(
-                          tooltip: 'Eliminar producto',
-                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                          onPressed: () async {
-                            final ok = await _confirmDialog(context, '¿Eliminar "${p.name}"?',
-                                'Esta acción quitará la prenda del catálogo.');
-                            if (ok) {
-                              state.products.remove(p);
-                              await state.commit();
-                            }
-                          },
-                        ),
-                      ]),
+    if (list.isEmpty) return const Center(child: Text('No hay productos con ese filtro'));
+    return ListView.separated(
+      padding: const EdgeInsets.all(20),
+      itemCount: list.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (_, i) {
+        final p = list[i];
+        return Card(
+          elevation: 0,
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: ProductImage(p.image, fallbackIcon: state.categoryIcon(p.categoryId)),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                flex: 3,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  Text(
+                    '${state.categoryName(p.categoryId)}${p.costPrice > 0 ? ' • Costo: ${usd(p.costPrice)}' : ''}',
+                    style: const TextStyle(color: NayColors.primary, fontSize: 12),
+                  ),
+                  if (p.colors.isNotEmpty || p.sizes.isNotEmpty)
+                    Text(
+                      [
+                        if (p.colors.isNotEmpty) 'Colores: ${p.colors.join(', ')}',
+                        if (p.sizes.isNotEmpty) 'Tallas: ${p.sizes.join(', ')}',
+                      ].join(' • '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
-                  );
+                ]),
+              ),
+              SizedBox(width: 140, child: PriceText(p.price, fontSize: 15)),
+              Row(children: [
+                IconButton(
+                  icon: const Icon(Icons.remove_circle_outline),
+                  onPressed: p.stock > 0 ? () => state.adjustStock(p, p.stock - 1) : null,
+                ),
+                InkWell(
+                  onTap: () => _editStockQuick(context, p),
+                  child: Chip(
+                    backgroundColor: p.stock == 0
+                        ? Colors.red.shade100
+                        : (p.stock <= 5 ? Colors.orange.shade100 : Colors.green.shade100),
+                    label: Text('${p.stock} unid.', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline),
+                  onPressed: () => state.adjustStock(p, p.stock + 1),
+                ),
+              ]),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: p.active ? 'Visible en la tienda' : 'Oculto',
+                child: Switch(
+                  value: p.active,
+                  onChanged: (v) {
+                    p.active = v;
+                    state.commit();
+                  },
+                ),
+              ),
+              IconButton(
+                tooltip: 'Editar producto',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () => showDialog(context: context, builder: (_) => _ProductEditorDialog(product: p)),
+              ),
+              IconButton(
+                tooltip: 'Eliminar producto',
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                onPressed: () async {
+                  final ok = await _confirmDialog(
+                      context, '¿Eliminar "${p.name}"?', 'Esta acción quitará la prenda del catálogo.');
+                  if (ok) {
+                    state.products.remove(p);
+                    await state.commit();
+                  }
                 },
               ),
-      ),
-    ]);
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _movementsList(AppState state) {
+    final list = state.movements.where((m) {
+      if (_query.isEmpty) return true;
+      final q = _query.toLowerCase();
+      return m.productName.toLowerCase().contains(q) || m.reason.toLowerCase().contains(q);
+    }).toList();
+
+    if (list.isEmpty) return const Center(child: Text('Aún no hay movimientos de inventario registrados'));
+    return ListView.separated(
+      padding: const EdgeInsets.all(20),
+      itemCount: list.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 6),
+      itemBuilder: (_, i) {
+        final m = list[i];
+        final isIn = m.delta > 0;
+        final color = isIn ? Colors.green : (m.type == 'salida' ? Colors.red : Colors.orange);
+        return Card(
+          elevation: 0,
+          color: Colors.white,
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: color.withValues(alpha: 0.12),
+              child: Icon(isIn ? Icons.arrow_downward : Icons.arrow_upward, color: color, size: 20),
+            ),
+            title: Text(m.productName, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('${fmtDate(m.date)} • ${m.reason}'),
+            trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text('${isIn ? '+' : ''}${m.delta} unid.',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: color)),
+              Text('Stock quedó en ${m.stockAfter}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            ]),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _editStockQuick(BuildContext context, Product p) async {
@@ -474,21 +553,11 @@ class _InventoryTabState extends State<_InventoryTab> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, int.tryParse(ctrl.text)),
-            child: const Text('Guardar'),
-          ),
+          FilledButton(onPressed: () => Navigator.pop(ctx, int.tryParse(ctrl.text)), child: const Text('Guardar')),
         ],
       ),
     );
-    if (res != null) {
-      p.stock = res;
-      await state.commit();
-    }
-  }
-
-  Future<void> _openProductDialog(BuildContext context, {Product? product}) async {
-    await showDialog(context: context, builder: (_) => _ProductEditorDialog(product: product));
+    if (res != null) await state.adjustStock(p, res, reason: 'Edición directa de stock');
   }
 
   Future<void> _openBulkPriceDialog(BuildContext context) async {
@@ -553,6 +622,7 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
   final _form = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _desc;
+  late final TextEditingController _cost;
   late final TextEditingController _price;
   late final TextEditingController _stock;
   late final TextEditingController _sizes;
@@ -568,6 +638,7 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
     final state = AppScope.read(context);
     _name = TextEditingController(text: p?.name ?? '');
     _desc = TextEditingController(text: p?.description ?? '');
+    _cost = TextEditingController(text: p != null && p.costPrice > 0 ? p.costPrice.toStringAsFixed(2) : '');
     _price = TextEditingController(text: p != null ? p.price.toStringAsFixed(2) : '');
     _stock = TextEditingController(text: '${p?.stock ?? 10}');
     _sizes = TextEditingController(text: p?.sizes.join(', ') ?? '');
@@ -581,6 +652,7 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
   void dispose() {
     _name.dispose();
     _desc.dispose();
+    _cost.dispose();
     _price.dispose();
     _stock.dispose();
     _sizes.dispose();
@@ -595,6 +667,65 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
     if (mounted) setState(() => _image.text = stored);
   }
 
+  Future<void> _addCustomColorDialog() async {
+    final nameCtrl = TextEditingController();
+    const swatches = [
+      0xFFE91E63, 0xFF9C27B0, 0xFF3F51B5, 0xFF009688,
+      0xFF4CAF50, 0xFFFF9800, 0xFF795548, 0xFF607D8B,
+      0xFFFFCDD2, 0xFFE1BEE7, 0xFFB2DFDB, 0xFFFFECB3,
+    ];
+    var pickedHex = swatches.first;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Nuevo color personalizado'),
+          content: SizedBox(
+            width: 340,
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Nombre del color (ej. Coral, Turquesa)'),
+              ),
+              const SizedBox(height: 14),
+              const Text('Tono aproximado:', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final hex in swatches)
+                  InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => setLocal(() => pickedHex = hex),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(hex),
+                        border: Border.all(
+                          color: pickedHex == hex ? NayColors.primary : Colors.grey.shade400,
+                          width: pickedHex == hex ? 3 : 1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ]),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Agregar color')),
+          ],
+        ),
+      ),
+    );
+    if (ok == true && nameCtrl.text.trim().isNotEmpty && mounted) {
+      final name = nameCtrl.text.trim();
+      await AppScope.read(context).addCustomColor(name, pickedHex);
+      if (mounted && !_colors.contains(name)) setState(() => _colors.add(name));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
@@ -604,7 +735,7 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
     return AlertDialog(
       title: Text(widget.product == null ? 'Nuevo producto' : 'Editar producto'),
       content: SizedBox(
-        width: 720,
+        width: 740,
         child: SingleChildScrollView(
           child: Form(
             key: _form,
@@ -657,10 +788,22 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
               Row(children: [
                 Expanded(
                   child: TextFormField(
+                    controller: _cost,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Costo compra (USD, opcional)',
+                      prefixText: '\$ ',
+                      helperText: 'Solo lo ve el admin',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: TextFormField(
                     controller: _price,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
-                      labelText: 'Precio en Dólares (USD)',
+                      labelText: 'Precio de venta (USD)',
                       prefixText: '\$ ',
                       helperText: 'Equivalente: ${bs(parsedPrice, rate)}',
                     ),
@@ -677,7 +820,7 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
                     controller: _stock,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(labelText: 'Stock disponible (unidades)'),
+                    decoration: const InputDecoration(labelText: 'Stock (unidades)'),
                     validator: (v) => int.tryParse(v ?? '') == null ? 'Número inválido' : null,
                   ),
                 ),
@@ -706,10 +849,18 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
                 decoration: const InputDecoration(hintText: 'Ej: XS, S, M, L, XL'),
               ),
               const SizedBox(height: 14),
-              const Text('Colores disponibles:', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
+              Row(children: [
+                const Text('Colores disponibles:', style: TextStyle(fontWeight: FontWeight.w600)),
+                const Spacer(),
+                TextButton.icon(
+                  icon: const Icon(Icons.palette_outlined, size: 18),
+                  label: const Text('Agregar color nuevo'),
+                  onPressed: _addCustomColorDialog,
+                ),
+              ]),
+              const SizedBox(height: 6),
               Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final c in kColorPalette.keys)
+                for (final c in state.allColorNames)
                   FilterChip(
                     avatar: ColorDot(c, size: 16),
                     label: Text(c, style: const TextStyle(fontSize: 12)),
@@ -741,37 +892,46 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
             if (!_form.currentState!.validate()) return;
             final sizes = _sizes.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
             final price = double.parse(_price.text.replaceAll(',', '.'));
+            final cost = double.tryParse(_cost.text.replaceAll(',', '.')) ?? 0;
             final stock = int.parse(_stock.text);
 
             if (widget.product == null) {
-              state.products.insert(
-                0,
-                Product(
-                  id: state.newId('p'),
-                  name: _name.text.trim(),
-                  description: _desc.text.trim(),
-                  price: price,
-                  categoryId: _catId,
-                  image: _image.text.trim(),
-                  sizes: sizes,
-                  colors: _colors,
-                  stock: stock,
-                  active: _active,
-                ),
+              final prod = Product(
+                id: state.newId('p'),
+                name: _name.text.trim(),
+                description: _desc.text.trim(),
+                price: price,
+                costPrice: cost,
+                categoryId: _catId,
+                image: _image.text.trim(),
+                sizes: sizes,
+                colors: _colors,
+                stock: 0,
+                active: _active,
               );
+              state.products.insert(0, prod);
+              if (stock > 0) {
+                await state.adjustStock(prod, stock, reason: 'Stock inicial de producto nuevo');
+              } else {
+                await state.commit();
+              }
             } else {
               final p = widget.product!;
               p.name = _name.text.trim();
               p.description = _desc.text.trim();
               p.price = price;
+              p.costPrice = cost;
               p.categoryId = _catId;
               p.image = _image.text.trim();
               p.sizes = sizes;
               p.colors = _colors;
-              p.stock = stock;
               p.active = _active;
+              if (p.stock != stock) {
+                await state.adjustStock(p, stock, reason: 'Editado desde ficha de producto');
+              } else {
+                await state.commit();
+              }
             }
-            await state.commit();
             if (context.mounted) Navigator.pop(context);
           },
           child: const Text('Guardar'),
@@ -782,7 +942,492 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
 }
 
 // ============================================================================
-// 3. CATEGORÍAS / TIPOS DE PRENDA
+// 3. PROVEEDORES Y LLEGADAS DE MERCANCÍA
+// ============================================================================
+class _SuppliersTab extends StatefulWidget {
+  const _SuppliersTab();
+
+  @override
+  State<_SuppliersTab> createState() => _SuppliersTabState();
+}
+
+class _SuppliersTabState extends State<_SuppliersTab> {
+  bool _showDirectory = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context);
+    final rate = state.settings.exchangeRate;
+
+    return Column(children: [
+      Container(
+        color: Colors.white,
+        padding: const EdgeInsets.all(16),
+        child: Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(value: false, icon: Icon(Icons.inventory, size: 18), label: Text('Llegadas de mercancía')),
+              ButtonSegment(value: true, icon: Icon(Icons.store_outlined, size: 18), label: Text('Proveedores')),
+            ],
+            selected: {_showDirectory},
+            onSelectionChanged: (s) => setState(() => _showDirectory = s.first),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            icon: const Icon(Icons.add_box_outlined),
+            label: const Text('Registrar llegada de mercancía'),
+            onPressed: () {
+              if (state.suppliers.isEmpty) {
+                showSnack(context, 'Primero registra al menos un proveedor', error: true);
+                setState(() => _showDirectory = true);
+                _openSupplierDialog(context);
+                return;
+              }
+              showDialog(context: context, builder: (_) => const _PurchaseDialog());
+            },
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.person_add_alt_1),
+            label: const Text('Nuevo proveedor'),
+            onPressed: () => _openSupplierDialog(context),
+          ),
+          if (!_showDirectory && state.purchases.isNotEmpty) ...[
+            OutlinedButton.icon(
+              icon: const Icon(Icons.download),
+              label: const Text('PDF Compras'),
+              onPressed: () async {
+                final bytes = await PdfExporter.buildPurchasesPdf(state.purchases, rate);
+                final path = await PdfExporter.savePdf(bytes, 'Compras_Proveedores_NaySport.pdf');
+                if (path != null && context.mounted) showSnack(context, 'PDF guardado');
+              },
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.print),
+              label: const Text('Imprimir PDF'),
+              onPressed: () async {
+                final bytes = await PdfExporter.buildPurchasesPdf(state.purchases, rate);
+                await PdfExporter.openToPrint(bytes, 'Compras_Proveedores_NaySport.pdf');
+              },
+            ),
+          ],
+        ]),
+      ),
+      Expanded(
+        child: _showDirectory ? _suppliersList(state) : _purchasesList(state, rate),
+      ),
+    ]);
+  }
+
+  Widget _suppliersList(AppState state) {
+    if (state.suppliers.isEmpty) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.local_shipping_outlined, size: 72, color: Colors.grey.shade400),
+          const SizedBox(height: 12),
+          const Text('No hay proveedores registrados todavía'),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            icon: const Icon(Icons.add),
+            label: const Text('Agregar primer proveedor'),
+            onPressed: () => _openSupplierDialog(context),
+          ),
+        ]),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(20),
+      itemCount: state.suppliers.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (_, i) {
+        final s = state.suppliers[i];
+        return Card(
+          elevation: 0,
+          color: Colors.white,
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: NayColors.logoBg,
+              child: const Icon(Icons.store, color: NayColors.primary),
+            ),
+            title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text(
+              [
+                if (s.phone.isNotEmpty) 'Tel: ${s.phone}',
+                if (s.city.isNotEmpty) s.city,
+                if (s.specialty.isNotEmpty) 'Surte: ${s.specialty}',
+              ].join(' • '),
+            ),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              IconButton(
+                tooltip: 'Editar',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: () => _openSupplierDialog(context, supplier: s),
+              ),
+              IconButton(
+                tooltip: 'Eliminar',
+                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                onPressed: () async {
+                  final ok = await _confirmDialog(context, '¿Eliminar proveedor "${s.name}"?', '');
+                  if (ok) {
+                    state.suppliers.remove(s);
+                    await state.commit();
+                  }
+                },
+              ),
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _purchasesList(AppState state, double rate) {
+    if (state.purchases.isEmpty) {
+      return const Center(child: Text('Aún no has registrado llegadas de mercancía'));
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(20),
+      itemCount: state.purchases.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (_, i) {
+        final c = state.purchases[i];
+        return Card(
+          elevation: 0,
+          color: Colors.white,
+          child: ExpansionTile(
+            title: Text('${c.id} — ${c.supplierName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('${fmtDate(c.date)} • ${c.totalUnits} unid.${c.invoiceRef.isNotEmpty ? ' • Fact. ${c.invoiceRef}' : ''}'),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              ChoiceChip(
+                label: Text(c.paid ? 'Pagada' : 'Pendiente'),
+                selected: c.paid,
+                selectedColor: Colors.green.shade100,
+                backgroundColor: Colors.orange.shade100,
+                onSelected: (v) {
+                  c.paid = !c.paid;
+                  state.commit();
+                },
+              ),
+              const SizedBox(width: 12),
+              PriceText(c.totalCost, fontSize: 15, align: CrossAxisAlignment.end),
+            ]),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            children: [
+              const Divider(),
+              for (final l in c.lines)
+                Row(children: [
+                  Expanded(child: Text('${l.qty}× ${l.productName}${l.note != null && l.note!.isNotEmpty ? ' (${l.note})' : ''}')),
+                  Text('${usd(l.unitCost)} c/u  →  ${usd(l.total)}'),
+                ]),
+              if (c.notes.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Align(alignment: Alignment.centerLeft, child: Text('Notas: ${c.notes}')),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openSupplierDialog(BuildContext context, {Supplier? supplier}) async {
+    final nameCtrl = TextEditingController(text: supplier?.name ?? '');
+    final phoneCtrl = TextEditingController(text: supplier?.phone ?? '');
+    final emailCtrl = TextEditingController(text: supplier?.email ?? '');
+    final cityCtrl = TextEditingController(text: supplier?.city ?? '');
+    final specCtrl = TextEditingController(text: supplier?.specialty ?? '');
+    final notesCtrl = TextEditingController(text: supplier?.notes ?? '');
+    final formKey = GlobalKey<FormState>();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(supplier == null ? 'Nuevo proveedor' : 'Editar proveedor'),
+        content: SizedBox(
+          width: 460,
+          child: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Nombre o empresa'),
+                  validator: (v) => (v ?? '').trim().isEmpty ? 'Requerido' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phoneCtrl,
+                  decoration: const InputDecoration(labelText: 'Teléfono / WhatsApp'),
+                  validator: (v) => (v ?? '').trim().isEmpty ? 'Requerido' : null,
+                ),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(
+                    child: TextFormField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Correo')),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(controller: cityCtrl, decoration: const InputDecoration(labelText: 'Ciudad / País')),
+                  ),
+                ]),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: specCtrl,
+                  decoration: const InputDecoration(labelText: '¿Qué surte? (ej. Ropa deportiva, Calzado)'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: notesCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'Notas adicionales'),
+                ),
+              ]),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true && context.mounted) {
+      final state = AppScope.read(context);
+      if (supplier == null) {
+        state.suppliers.add(Supplier(
+          id: state.newId('sup_'),
+          name: nameCtrl.text.trim(),
+          phone: phoneCtrl.text.trim(),
+          email: emailCtrl.text.trim(),
+          city: cityCtrl.text.trim(),
+          specialty: specCtrl.text.trim(),
+          notes: notesCtrl.text.trim(),
+        ));
+      } else {
+        supplier.name = nameCtrl.text.trim();
+        supplier.phone = phoneCtrl.text.trim();
+        supplier.email = emailCtrl.text.trim();
+        supplier.city = cityCtrl.text.trim();
+        supplier.specialty = specCtrl.text.trim();
+        supplier.notes = notesCtrl.text.trim();
+      }
+      await state.commit();
+    }
+  }
+}
+
+class _PurchaseDialog extends StatefulWidget {
+  const _PurchaseDialog();
+
+  @override
+  State<_PurchaseDialog> createState() => _PurchaseDialogState();
+}
+
+class _PurchaseDialogState extends State<_PurchaseDialog> {
+  String? _supplierId;
+  final _invoice = TextEditingController();
+  final _notes = TextEditingController();
+  bool _paid = true;
+  final List<PurchaseLine> _lines = [];
+
+  @override
+  void initState() {
+    super.initState();
+    final state = AppScope.read(context);
+    if (state.suppliers.isNotEmpty) _supplierId = state.suppliers.first.id;
+  }
+
+  @override
+  void dispose() {
+    _invoice.dispose();
+    _notes.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addLine() async {
+    final state = AppScope.read(context);
+    if (state.products.isEmpty) return;
+    Product selected = state.products.first;
+    final qtyCtrl = TextEditingController(text: '10');
+    final costCtrl = TextEditingController(text: selected.costPrice > 0 ? selected.costPrice.toStringAsFixed(2) : '15.00');
+    final noteCtrl = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Agregar prenda recibida'),
+          content: SizedBox(
+            width: 400,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              DropdownButtonFormField<Product>(
+                initialValue: selected,
+                decoration: const InputDecoration(labelText: 'Producto'),
+                items: [for (final p in state.products) DropdownMenuItem(value: p, child: Text(p.name))],
+                onChanged: (p) {
+                  if (p == null) return;
+                  setLocal(() {
+                    selected = p;
+                    if (p.costPrice > 0) costCtrl.text = p.costPrice.toStringAsFixed(2);
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: qtyCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(labelText: 'Cantidad recibida'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: costCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Costo unitario (USD)', prefixText: '\$ '),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteCtrl,
+                decoration: const InputDecoration(labelText: 'Colores / Tallas recibidas (opcional)'),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Agregar')),
+          ],
+        ),
+      ),
+    );
+    if (ok == true) {
+      final qty = int.tryParse(qtyCtrl.text) ?? 0;
+      final cost = double.tryParse(costCtrl.text.replaceAll(',', '.')) ?? 0;
+      if (qty <= 0) return;
+      setState(() => _lines.add(PurchaseLine(
+            productId: selected.id,
+            productName: selected.name,
+            qty: qty,
+            unitCost: cost,
+            note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
+          )));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context);
+    final total = _lines.fold(0.0, (s, l) => s + l.total);
+
+    return AlertDialog(
+      title: const Text('Registrar llegada de mercancía'),
+      content: SizedBox(
+        width: 620,
+        child: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(
+                flex: 3,
+                child: DropdownButtonFormField<String>(
+                  initialValue: _supplierId,
+                  decoration: const InputDecoration(labelText: 'Proveedor'),
+                  items: [for (final s in state.suppliers) DropdownMenuItem(value: s.id, child: Text(s.name))],
+                  onChanged: (v) => setState(() => _supplierId = v),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: TextField(
+                  controller: _invoice,
+                  decoration: const InputDecoration(labelText: 'N° Factura / Guía'),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            Row(children: [
+              const Text('Prendas que llegaron:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              FilledButton.tonalIcon(icon: const Icon(Icons.add), label: const Text('Agregar prenda'), onPressed: _addLine),
+            ]),
+            const SizedBox(height: 8),
+            if (_lines.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 14),
+                child: Text('Agrega las prendas que trajo el proveedor para sumar al stock.'),
+              )
+            else
+              for (final l in _lines)
+                ListTile(
+                  dense: true,
+                  title: Text('${l.qty}× ${l.productName}'),
+                  subtitle: Text('${usd(l.unitCost)} c/u${l.note != null ? ' • ${l.note}' : ''}'),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(usd(l.total), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18, color: Colors.red),
+                      onPressed: () => setState(() => _lines.remove(l)),
+                    ),
+                  ]),
+                ),
+            const Divider(),
+            Row(children: [
+              Expanded(child: TextField(controller: _notes, decoration: const InputDecoration(labelText: 'Notas'))),
+              const SizedBox(width: 12),
+              FilterChip(
+                label: Text(_paid ? 'Factura Pagada' : 'Por Pagar'),
+                selected: _paid,
+                onSelected: (v) => setState(() => _paid = v),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text('Total inversión: ${usd(total)}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: NayColors.primary)),
+            ),
+          ]),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: _lines.isEmpty || _supplierId == null
+              ? null
+              : () async {
+                  final sup = state.suppliers.firstWhere((s) => s.id == _supplierId);
+                  await state.recordSupplierPurchase(
+                    supplier: sup,
+                    invoiceRef: _invoice.text.trim(),
+                    paid: _paid,
+                    notes: _notes.text.trim(),
+                    lines: _lines,
+                  );
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    showSnack(context, 'Mercancía ingresada y sumada al stock');
+                  }
+                },
+          child: const Text('Guardar entrada y sumar stock'),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================================
+// 4. CATEGORÍAS / TIPOS DE PRENDA
 // ============================================================================
 class _CategoriesTab extends StatelessWidget {
   const _CategoriesTab();
@@ -888,7 +1533,119 @@ class _CategoriesTab extends StatelessWidget {
 }
 
 // ============================================================================
-// 4. HISTORIAL DE VENTAS Y PDF
+// 5. CLIENTES REGISTRADOS
+// ============================================================================
+class _CustomersTab extends StatefulWidget {
+  const _CustomersTab();
+
+  @override
+  State<_CustomersTab> createState() => _CustomersTabState();
+}
+
+class _CustomersTabState extends State<_CustomersTab> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppScope.of(context);
+    final rate = state.settings.exchangeRate;
+    final filtered = state.users.where((u) {
+      if (_query.isEmpty) return true;
+      final q = _query.toLowerCase();
+      return u.name.toLowerCase().contains(q) ||
+          u.email.toLowerCase().contains(q) ||
+          u.phone.toLowerCase().contains(q);
+    }).toList();
+
+    return Column(children: [
+      Container(
+        color: Colors.white,
+        padding: const EdgeInsets.all(16),
+        child: Row(children: [
+          const Text('Clientes y Cuentas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(width: 20),
+          SizedBox(
+            width: 300,
+            child: TextField(
+              decoration: const InputDecoration(
+                  hintText: 'Buscar por nombre, correo o teléfono...', prefixIcon: Icon(Icons.search), isDense: true),
+              onChanged: (v) => setState(() => _query = v),
+            ),
+          ),
+          const Spacer(),
+          Text('Total: ${filtered.length} usuario(s)', style: TextStyle(color: Colors.grey.shade700)),
+        ]),
+      ),
+      Expanded(
+        child: ListView.separated(
+          padding: const EdgeInsets.all(20),
+          itemCount: filtered.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 8),
+          itemBuilder: (_, i) {
+            final u = filtered[i];
+            final userOrders =
+                state.orders.where((o) => o.customerEmail.toLowerCase() == u.email.toLowerCase()).toList();
+            final spent = userOrders.fold(0.0, (s, o) => s + o.total);
+            final lastOrder = userOrders.isNotEmpty ? userOrders.first : null;
+            return Card(
+              elevation: 0,
+              color: Colors.white,
+              child: ExpansionTile(
+                leading: CircleAvatar(
+                  backgroundColor: u.isAdmin ? NayColors.primary : NayColors.logoBg,
+                  child: Icon(u.isAdmin ? Icons.shield : Icons.person,
+                      color: u.isAdmin ? Colors.white : NayColors.primary),
+                ),
+                title: Row(children: [
+                  Text(u.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 8),
+                  Chip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text(u.isAdmin ? 'Admin' : 'Cliente', style: const TextStyle(fontSize: 11)),
+                  ),
+                ]),
+                subtitle: Text(
+                  '${u.email}${u.phone.isNotEmpty ? ' • Tel: ${u.phone}' : ''} • Registro: ${fmtDay(u.createdAt)}',
+                ),
+                trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text('${userOrders.length} pedido(s)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(usd(spent), style: const TextStyle(color: NayColors.primary, fontSize: 13)),
+                ]),
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                children: [
+                  const Divider(),
+                  if (lastOrder != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Última dirección: ${lastOrder.address}, ${lastOrder.city}, ${lastOrder.country} (CP ${lastOrder.postalCode})',
+                        ),
+                      ),
+                    ),
+                  if (userOrders.isEmpty)
+                    const Text('Este usuario aún no ha realizado compras.')
+                  else
+                    for (final o in userOrders)
+                      ListTile(
+                        dense: true,
+                        title: Text('${o.id} • ${fmtDate(o.date)} • ${o.paymentMethod}'),
+                        subtitle: Text(o.lines.map((l) => '${l.qty}x ${l.productName}').join(', ')),
+                        trailing: Text('${usd(o.total)} (${bs(o.total, o.exchangeRate > 0 ? o.exchangeRate : rate)})'),
+                      ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    ]);
+  }
+}
+
+// ============================================================================
+// 6. HISTORIAL DE VENTAS Y PDF (EXCLUSIVO ADMIN)
 // ============================================================================
 class _OrdersTab extends StatefulWidget {
   const _OrdersTab();
@@ -910,6 +1667,7 @@ class _OrdersTabState extends State<_OrdersTab> {
         final match = o.id.toLowerCase().contains(q) ||
             o.customerName.toLowerCase().contains(q) ||
             o.customerEmail.toLowerCase().contains(q) ||
+            o.customerPhone.toLowerCase().contains(q) ||
             o.paymentMethod.toLowerCase().contains(q);
         if (!match) return false;
       }
@@ -1044,18 +1802,26 @@ class _OrdersTabState extends State<_OrdersTab> {
                     child: ExpansionTile(
                       title: Text('${o.id} — ${o.customerName}', style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text('${fmtDate(o.date)} • ${o.paymentMethod} • ${o.units} unid.'),
-                      trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-                        Text(usd(o.total),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: NayColors.primary)),
-                        Text(bs(o.total, o.exchangeRate > 0 ? o.exchangeRate : rate),
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                      ]),
+                      trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(usd(o.total),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 16, color: NayColors.primary)),
+                            Text(bs(o.total, o.exchangeRate > 0 ? o.exchangeRate : rate),
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                          ]),
                       childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       children: [
                         const Divider(),
                         Align(
                           alignment: Alignment.centerLeft,
-                          child: Text('Correo: ${o.customerEmail}\nEnvío: ${o.address}, ${o.city}, ${o.country} (CP ${o.postalCode})'),
+                          child: Text(
+                            'Correo: ${o.customerEmail}${o.customerPhone.isNotEmpty ? ' • Tel: ${o.customerPhone}' : ''}\n'
+                            'Envío: ${o.address}, ${o.city}, ${o.country} (CP ${o.postalCode})'
+                            '${o.paymentDetails.isNotEmpty ? '\nDetalle de pago: ${o.paymentDetails}' : ''}',
+                          ),
                         ),
                         const SizedBox(height: 8),
                         for (final l in o.lines)
@@ -1068,8 +1834,18 @@ class _OrdersTabState extends State<_OrdersTab> {
                                   style: const TextStyle(color: Colors.green)),
                             Text(usd(l.total)),
                           ]),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
                         Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                          TextButton.icon(
+                            icon: const Icon(Icons.download, size: 18),
+                            label: const Text('Descargar recibo PDF'),
+                            onPressed: () async {
+                              final bytes = await PdfExporter.buildReceiptPdf(o);
+                              final path = await PdfExporter.savePdf(bytes, 'Recibo_${o.id}.pdf');
+                              if (path != null && context.mounted) showSnack(context, 'Recibo guardado');
+                            },
+                          ),
+                          const SizedBox(width: 8),
                           OutlinedButton.icon(
                             icon: const Icon(Icons.print, size: 18),
                             label: const Text('Imprimir recibo PDF'),
@@ -1090,7 +1866,7 @@ class _OrdersTabState extends State<_OrdersTab> {
 }
 
 // ============================================================================
-// 5. CONFIGURACIÓN (TASA BS, DESCUENTOS, CLIENTES, LIMPIEZA)
+// 7. CONFIGURACIÓN (API BCV, TASA, DESCUENTOS, SEGURIDAD)
 // ============================================================================
 class _SettingsTab extends StatefulWidget {
   const _SettingsTab();
@@ -1103,6 +1879,7 @@ class _SettingsTabState extends State<_SettingsTab> {
   late final TextEditingController _rate;
   late final TextEditingController _ship;
   late final TextEditingController _freeShip;
+  bool _syncing = false;
 
   @override
   void initState() {
@@ -1121,6 +1898,20 @@ class _SettingsTabState extends State<_SettingsTab> {
     super.dispose();
   }
 
+  Future<void> _syncBcv(String source) async {
+    setState(() => _syncing = true);
+    final state = AppScope.read(context);
+    final ok = await state.syncBcvRate(source: source);
+    if (!mounted) return;
+    setState(() => _syncing = false);
+    if (ok) {
+      _rate.text = state.settings.exchangeRate.toStringAsFixed(2);
+      showSnack(context, 'Tasa actualizada desde $source: ${state.settings.exchangeRate.toStringAsFixed(2)} Bs/\$');
+    } else {
+      showSnack(context, 'No se pudo conectar a la API ($source). Se mantiene la tasa actual.', error: true);
+    }
+  }
+
   Future<void> _saveNumbers() async {
     final state = AppScope.read(context);
     final rate = double.tryParse(_rate.text.replaceAll(',', '.'));
@@ -1129,6 +1920,10 @@ class _SettingsTabState extends State<_SettingsTab> {
     if (rate == null || rate <= 0 || ship == null || ship < 0 || free == null || free < 0) {
       showSnack(context, 'Revisa los valores numéricos', error: true);
       return;
+    }
+    if ((state.settings.exchangeRate - rate).abs() > 0.001) {
+      state.settings.rateSource = 'Manual';
+      state.settings.lastRateUpdate = DateTime.now();
     }
     state.settings.exchangeRate = rate;
     state.settings.shippingCost = ship;
@@ -1150,15 +1945,49 @@ class _SettingsTabState extends State<_SettingsTab> {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Moneda y Envíos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 14),
+            Row(children: [
+              const Text('Tasa del dólar (API BCV) y Envíos',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              if (state.settings.lastRateUpdate != null)
+                Text(
+                  'Última actualización (${state.settings.rateSource}): ${fmtDate(state.settings.lastRateUpdate!)}',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
+            ]),
+            const SizedBox(height: 12),
+            Wrap(spacing: 12, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              FilledButton.icon(
+                icon: _syncing
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.sync),
+                label: const Text('Actualizar tasa BCV Oficial'),
+                onPressed: _syncing ? null : () => _syncBcv('BCV Oficial'),
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.currency_exchange),
+                label: const Text('Consultar Paralelo'),
+                onPressed: _syncing ? null : () => _syncBcv('Paralelo'),
+              ),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Switch(
+                  value: state.settings.autoSyncBcv,
+                  onChanged: (v) {
+                    state.settings.autoSyncBcv = v;
+                    state.commit();
+                  },
+                ),
+                const Text('Sincronizar BCV al iniciar la app'),
+              ]),
+            ]),
+            const SizedBox(height: 18),
             Row(children: [
               Expanded(
                 child: TextField(
                   controller: _rate,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    labelText: 'Tasa del dólar (Bs por 1 \$)',
+                    labelText: 'Tasa manual (Bs por 1 \$)',
                     helperText: 'Ejemplo: \$10.00 = ${bs(10, previewRate)}',
                   ),
                   onChanged: (_) => setState(() {}),
@@ -1216,31 +2045,6 @@ class _SettingsTabState extends State<_SettingsTab> {
                     },
                   ),
               ]),
-          ]),
-        ),
-      ),
-      const SizedBox(height: 16),
-      Card(
-        elevation: 0,
-        color: Colors.white,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Usuarios registrados (${state.users.length})',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            for (final u in state.users)
-              ListTile(
-                dense: true,
-                leading: CircleAvatar(
-                  backgroundColor: u.isAdmin ? NayColors.primary : Colors.grey.shade300,
-                  child: Icon(u.isAdmin ? Icons.shield : Icons.person,
-                      color: u.isAdmin ? Colors.white : Colors.black54, size: 18),
-                ),
-                title: Text(u.name),
-                subtitle: Text('${u.email}${u.phone.isNotEmpty ? ' • ${u.phone}' : ''} • ${fmtDay(u.createdAt)}'),
-                trailing: Chip(label: Text(u.isAdmin ? 'Admin' : 'Cliente')),
-              ),
           ]),
         ),
       ),

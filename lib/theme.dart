@@ -158,16 +158,19 @@ class PriceText extends StatelessWidget {
   }
 }
 
-/// Círculo de color.
+/// Círculo de color (soporta paleta base y colores personalizados del admin).
 class ColorDot extends StatelessWidget {
   final String colorName;
   final double size;
   final bool selected;
-  const ColorDot(this.colorName, {super.key, this.size = 28, this.selected = false});
+  final int? hexOverride;
+  const ColorDot(this.colorName, {super.key, this.size = 28, this.selected = false, this.hexOverride});
 
   @override
   Widget build(BuildContext context) {
-    final c = Color(kColorPalette[colorName] ?? 0xFFCCCCCC);
+    final scopeHex = context.dependOnInheritedWidgetOfExactType<AppScope>()?.notifier?.colorHexFor(colorName);
+    final hex = hexOverride ?? scopeHex ?? kColorPalette[colorName] ?? 0xFFCCCCCC;
+    final c = Color(hex);
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       width: size,
