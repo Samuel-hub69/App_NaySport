@@ -1,0 +1,133 @@
+================================================================================
+                    GUÍA DE USO - NAYSPORT (APP DE ESCRITORIO)
+================================================================================
+
+1. CÓMO ABRIR LA APP
+--------------------------------------------------------------------------------
+- Si estás en tu PC: abre el acceso directo "NaySport" en C:\NaySport.
+- Si te pasaron la carpeta comprimida (.zip): descomprime TODA la carpeta y haz
+  doble clic en "naysport.exe". (No saques el .exe solo de la carpeta).
+
+2. CÓMO ENTRAR COMO ADMINISTRADOR
+--------------------------------------------------------------------------------
+1) Arriba a la derecha, haz clic en "Iniciar sesión".
+2) Ingresa las credenciales predeterminadas:
+   - Correo:     admin@naysport.com
+   - Contraseña: Admin2026!
+3) Haz clic en "Ingresar".
+4) Arriba a la derecha aparecerá el botón "Panel admin". Haz clic ahí.
+
+(Nota: si te registras con el formulario "Regístrate", entras como Cliente
+normal y NO verás el botón de Panel admin).
+
+3. CÓMO FUNCIONA CADA APARTADO DEL PANEL ADMIN
+--------------------------------------------------------------------------------
+
+[1] RESUMEN
+  Es la vista rápida del negocio. Aquí ves:
+  - Ventas totales en dólares ($) y su equivalente en bolívares (Bs).
+  - Ganancia estimada (calculada con el precio de costo de las prendas).
+  - Cantidad de pedidos realizados y unidades vendidas.
+  - Cantidad de productos activos, proveedores y clientes registrados.
+  - Alertas de inventario: muestra los productos agotados (0) o con stock bajo
+    (5 unidades o menos), con un botón rápido "+10" para reponer al instante.
+  - Últimas ventas realizadas.
+
+[2] STOCK Y KARDEX
+  Tiene dos vistas arriba: "Catálogo" y "Movimientos (Kardex)".
+
+  A) Catálogo:
+     - Buscador y filtros por Categoría o por estado (Todos, Bajo, Agotado,
+       Ocultos).
+     - Botones - y + en cada prenda para sumar o restar stock rápido, o clic
+       en el chip verde/naranja/rojo para escribir el número exacto.
+     - Interruptor (switch) para ocultar una prenda de la tienda sin borrarla.
+     - Editar o Eliminar producto.
+     - Botón "Nuevo producto": permite subir una foto desde tu computadora
+       ("Elegir foto"), poner nombre, descripción, categoría, costo de compra
+       (solo lo ve el admin), precio de venta en USD (muestra el cálculo en Bs),
+       stock, tallas (con atajos para Ropa o Calzado), colores y hasta crear
+       colores nuevos con "Agregar color nuevo".
+     - Botón "Ajustar precios (%)": sube o baja precios de forma masiva (ej:
+       +10 para aumentar 10%, o -15 para liquidación/limpieza), ya sea a toda
+       la tienda o a una sola categoría.
+     - Botón "Stock PDF": descarga un PDF con todo el inventario, precios en
+       $ y Bs, costos y estado del stock.
+
+  B) Movimientos (Kardex):
+     - Registra automáticamente cada cambio de inventario:
+       * Entradas (+) cuando llega mercancía de un proveedor o repones stock.
+       * Salidas (-) cuando un cliente realiza una compra.
+       * Ajustes manuales realizados por el admin.
+     - Permite limpiar el historial de movimientos sin afectar el stock actual.
+
+[3] PROVEEDORES
+  Tiene dos vistas arriba: "Llegadas de mercancía" y "Proveedores".
+
+  A) Proveedores (Directorio):
+     - Botón "Nuevo proveedor": registra mayoristas/fábricas con nombre,
+       teléfono/WhatsApp, correo, ciudad/país, qué productos surte y notas.
+
+  B) Llegadas de mercancía (Compras):
+     - Botón "Registrar llegada de mercancía": eliges el proveedor, número de
+       factura/guía, marcas si la factura quedó "Factura Pagada" o "Por Pagar",
+       y agregas las prendas que llegaron con cantidad y costo unitario.
+     - Al guardar, SUMA AUTOMÁTICAMENTE esas unidades al stock de la tienda,
+       actualiza el costo de la prenda y queda anotado en el Kardex.
+     - Puedes cambiar de "Pendiente" a "Pagada" haciendo clic en la etiqueta,
+       y exportar o imprimir un reporte en "PDF Compras".
+
+[4] CATEGORÍAS
+  - Muestra los tipos de prenda actuales (Casual, Deportiva, Calzado, Prendas,
+    Perfumes, Accesorios).
+  - Botón "Agregar categoría": crea nuevas categorías eligiendo nombre e ícono.
+  - Puedes editar o eliminar categorías vacías (si tiene productos, primero
+    cambia o borra esos productos por seguridad).
+
+[5] CLIENTES
+  - Lista todas las cuentas registradas en la app con su correo, teléfono y
+    fecha de registro.
+  - Muestra cuántos pedidos ha hecho cada cliente y cuánto ha gastado.
+  - Al hacer clic sobre un cliente se despliega su última dirección de envío y
+    el detalle de todas sus compras.
+
+[6] HISTORIAL Y PDF
+  - Muestra todas las ventas realizadas en la tienda (del más reciente al más
+    antiguo).
+  - Puedes buscar por número de pedido, nombre, correo, teléfono o método de
+    pago, y filtrar por fecha: Todo, Hoy, 7 días, 30 días o Rango personalizado.
+  - "Descargar PDF": guarda un archivo PDF del historial filtrado en la carpeta
+    que elijas de tu PC.
+  - "Imprimir PDF": abre el PDF directamente en tu visor para imprimirlo.
+  - "Limpiar historial": borra los pedidos registrados (útil tras pruebas).
+  - Al expandir un pedido ves datos completos del cliente, envío, referencia
+    de pago y botones "Descargar recibo PDF" e "Imprimir recibo PDF" (solo
+    disponibles para el admin).
+
+[7] CONFIG Y BCV
+  - Tasa del dólar (API BCV):
+    * "Actualizar tasa BCV Oficial" y "Consultar Paralelo": consultan en vivo
+      la tasa del día por internet (ve.dolarapi.com). Si no hay internet,
+      mantiene la última tasa guardada.
+    * Interruptor "Sincronizar BCV al iniciar la app": actualiza la tasa sola
+      cada vez que se abre el programa.
+    * También puedes escribir la tasa manual, costo de envío y monto mínimo
+      para envío gratis, y darle a "Guardar".
+  - Descuentos por cantidad:
+    * Configura reglas automáticas (por defecto: 3+ unid -5%, 5+ unid -10%,
+      10+ unid -15%). El cliente los ve aplicados automáticamente en el carrito.
+  - Seguridad y Base de Datos local:
+    * Muestra dónde se guarda el archivo de base de datos (naysport_db.json)
+      en tu PC, permite abrir esa carpeta, cambiar la contraseña del admin y
+      restablecer el catálogo inicial de prueba.
+
+4. NOTAS IMPORTANTES DE ESTA VERSIÓN DE PRUEBA
+--------------------------------------------------------------------------------
+- Base de datos local: cada PC guarda sus propios cambios en
+  %APPDATA%\NaySport\naysport_db.json. En la versión final en producción esto se
+  conectará a una base de datos en la nube (Firebase/Supabase) y a pasarelas
+  de pago reales.
+- Imágenes actuales: los productos iniciales cargan imágenes de prueba desde
+  internet (algunas pueden salir aleatorias o mostrar el ícono rosado si no
+  cargaron a tiempo) hasta que se agreguen las fotos reales del catálogo.
+================================================================================
