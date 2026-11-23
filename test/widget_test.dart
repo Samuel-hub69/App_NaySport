@@ -254,7 +254,8 @@ void main() {
     await tester.tap(find.text('Punto de Venta'));
     await tester.pump();
     expect(find.textContaining('lote'), findsNothing);
-    expect(find.textContaining('por punto de venta en tienda'), findsOneWidget);
+    expect(find.textContaining('por punto de venta en tienda'), findsNothing);
+    expect(find.textContaining('Bs '), findsWidgets);
   });
 
   testWidgets('Categorías laterales se resaltan en rosado al pasar el mouse', (tester) async {

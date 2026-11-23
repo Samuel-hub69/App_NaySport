@@ -903,8 +903,8 @@ class _CashierPosViewState extends State<CashierPosView> {
   Widget _physicalPaymentField(double total, double rate) {
     switch (_method) {
       case PhysicalPaymentMethod.pos:
-        return Text('Cobrar ${bs(total, rate)} por punto de venta en tienda.',
-            style: const TextStyle(color: Color(0xFFD8B4FE), fontWeight: FontWeight.w600));
+        return Text(bs(total, rate),
+            style: const TextStyle(color: Color(0xFFD8B4FE), fontSize: 16, fontWeight: FontWeight.bold));
       case PhysicalPaymentMethod.pagoMovil:
         return TextFormField(
           controller: _refCtrl,
@@ -928,11 +928,11 @@ class _CashierPosViewState extends State<CashierPosView> {
           validator: (v) => (v ?? '').trim().length >= 3 ? null : 'Requerido',
         );
       case PhysicalPaymentMethod.cashUsd:
-        return Text('Cobrar ${usd(total)} en dólares físicos.',
-            style: const TextStyle(color: Color(0xFF6EE7B7), fontWeight: FontWeight.w600));
+        return Text(usd(total),
+            style: const TextStyle(color: Color(0xFF6EE7B7), fontSize: 16, fontWeight: FontWeight.bold));
       case PhysicalPaymentMethod.cashBs:
-        return Text('Cobrar ${bs(total, rate)} en bolívares físicos.',
-            style: const TextStyle(color: Color(0xFFFDBA74), fontWeight: FontWeight.w600));
+        return Text(bs(total, rate),
+            style: const TextStyle(color: Color(0xFFFDBA74), fontSize: 16, fontWeight: FontWeight.bold));
     }
   }
 }
