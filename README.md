@@ -80,16 +80,6 @@ Para ejecutar las pruebas automatizadas:
 flutter test
 ```
 
-## Cuentas de prueba
-
-Al abrir la app por primera vez en cualquier PC con Windows se inicializa automáticamente el catálogo completo junto con estas cuentas de acceso:
-
-| Rol | Correo | Contraseña | Acceso |
-|---|---|---|---|
-| **Administrador** | `admin@naysport.com` | `Admin2026!` | Panel completo (Resumen, Caja, Stock/Kardex, Proveedores, Categorías, Clientes, Historial/PDF, Config y BCV, Ver tienda) |
-| **Cajero** | `cajero@naysport.com` | `Cajero2026!` | Caja / Ventas en tienda física y resumen de sus ventas del día |
-| **Visitante / Cliente** | *(sin cuenta o registro)* | — | Catálogo online, carrito y compra con cuenta propia |
-
 ## Almacenamiento local
 
 Los datos se guardan automáticamente en disco en:
@@ -98,7 +88,7 @@ Los datos se guardan automáticamente en disco en:
 %APPDATA%\NaySport\naysport_db.json
 ```
 
-Las imágenes nuevas que importe el administrador desde el panel se copian a `%APPDATA%\NaySport\imagenes`. En una computadora nueva el archivo se crea limpio al iniciar la aplicación con las 6 categorías, los 59 productos iniciales y las cuentas de prueba.
+Las imágenes nuevas que importe el administrador desde el panel se copian a `%APPDATA%\NaySport\imagenes`. En una computadora nueva el archivo se crea limpio al iniciar la aplicación con las 6 categorías y los 59 productos iniciales.
 
 ## Cómo está hecho
 
