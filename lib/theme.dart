@@ -446,3 +446,76 @@ void showSnack(BuildContext context, String msg, {bool error = false}) {
     width: 420,
   ));
 }
+
+/// Etiqueta visual con código de barras estilo supermercado generada a partir del SKU/variante.
+class BarcodeDisplay extends StatelessWidget {
+  final String code;
+  final double height;
+  final double width;
+  const BarcodeDisplay({super.key, required this.code, this.height = 44, this.width = 190});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: NayColors.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: width - 20,
+            height: height,
+            child: CustomPaint(painter: _BarcodePainter(code)),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            code,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BarcodePainter extends CustomPainter {
+  final String code;
+  _BarcodePainter(this.code);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.black;
+    // Genera un patrón determinista de barras tipo Code-39/128 con guardas de inicio/fin.
+    final bits = <int>[1, 0, 1, 1, 0, 1, 0];
+    for (final cu in code.codeUnits) {
+      for (var b = 6; b >= 0; b--) {
+        bits.add((cu >> b) & 1);
+      }
+      bits.add(0);
+    }
+    bits.addAll([1, 1, 0, 1, 0, 1, 1]);
+
+    final unit = size.width / bits.length;
+    for (var i = 0; i < bits.length; i++) {
+      if (bits[i] == 1) {
+        canvas.drawRect(Rect.fromLTWH(i * unit, 0, unit * 0.95, size.height), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BarcodePainter oldDelegate) => oldDelegate.code != code;
+}

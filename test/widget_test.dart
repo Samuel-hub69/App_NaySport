@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:naysport/admin/admin_screen.dart';
 import 'package:naysport/app_state.dart';
 import 'package:naysport/db.dart';
+import 'package:naysport/excel_export.dart';
 import 'package:naysport/format.dart';
 import 'package:naysport/main.dart';
 import 'package:naysport/models.dart';
@@ -166,6 +167,24 @@ void main() {
     expect(String.fromCharCodes(purchasesPdf.take(5)), '%PDF-');
     expect(String.fromCharCodes(receiptPdf.take(5)), '%PDF-');
     expect(String.fromCharCodes(closingPdf.take(5)), '%PDF-');
+
+    // Verificar SKU, código de variante escaneable y exportación Excel (.xlsx)
+    expect(nikeBlack.sku, 'CAL-001');
+    final variantCode = nikeBlack.variantCode(color: 'Negro', size: '39');
+    expect(variantCode, 'CAL-001-NEG-39');
+    final resolved = reloaded.resolveBarcode(variantCode);
+    expect(resolved, isNotNull);
+    expect(resolved!.product.id, nikeBlack.id);
+    expect(resolved.color, 'Negro');
+    expect(resolved.size, '39');
+    expect(resolved.exactVariant, isTrue);
+
+    final xlsx = ExcelExporter.buildInventoryAndKardexXlsx(reloaded);
+    expect(String.fromCharCodes(xlsx.take(2)), 'PK');
+    final xlsxText = String.fromCharCodes(xlsx);
+    expect(xlsxText, contains('Inventario Detallado'));
+    expect(xlsxText, contains('Kardex Movimientos'));
+    expect(xlsxText, contains('CAL-001-NEG'));
   });
 
   testWidgets('Caja física exige datos del cliente y muestra solo los 4 métodos físicos', (tester) async {

@@ -26,7 +26,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final state = AppScope.of(context);
     final filtered = state.activeProducts.where((p) {
       final byCat = _selected == null || p.categoryId == _selected;
-      final byQuery = _query.isEmpty || p.name.toLowerCase().contains(_query.toLowerCase());
+      final q = _query.toLowerCase();
+      final byQuery = q.isEmpty || p.name.toLowerCase().contains(q) || p.sku.toLowerCase().contains(q);
       return byCat && byQuery;
     }).toList();
 
@@ -661,6 +662,20 @@ class _ProductDialogState extends State<ProductDialog> {
                     child: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
                   ),
                   Text(p.name, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  Row(children: [
+                    const Icon(Icons.qr_code_2, size: 15, color: NayColors.accent),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Código: ${p.variantCode(color: _color, size: _size)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        color: NayColors.accent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ]),
                   const SizedBox(height: 8),
                   PriceText(p.price, fontSize: 24, color: NayColors.primary),
                   const SizedBox(height: 12),

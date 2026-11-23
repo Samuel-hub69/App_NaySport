@@ -209,6 +209,51 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
+  /// Genera un código SKU único sugerido para un nuevo producto.
+  String suggestNextSku(String categoryId) {
+    final existing = products.map((p) => p.sku.toUpperCase()).toSet();
+    var seq = products.length + 1;
+    while (true) {
+      final candidate = Product.generateSku(categoryId, 'p$seq');
+      if (!existing.contains(candidate)) return candidate;
+      seq++;
+    }
+  }
+
+  /// Resuelve un código escaneado (base o variante color+talla) a su producto exacto.
+  ({Product product, String? color, String? size, bool exactVariant})? resolveBarcode(String raw) {
+    final code = raw.trim().toUpperCase();
+    if (code.isEmpty) return null;
+    for (final p in activeProducts) {
+      for (final v in p.allVariantCodes()) {
+        if (v.code == code) {
+          return (product: p, color: v.color, size: v.size, exactVariant: true);
+        }
+      }
+      if (p.colors.isNotEmpty) {
+        for (final c in p.colors) {
+          if (p.variantCode(color: c) == code) {
+            return (
+              product: p,
+              color: c,
+              size: p.sizes.length == 1 ? p.sizes.first : null,
+              exactVariant: p.sizes.length <= 1,
+            );
+          }
+        }
+      }
+      if (p.sku.toUpperCase() == code) {
+        return (
+          product: p,
+          color: p.colors.length == 1 ? p.colors.first : null,
+          size: p.sizes.length == 1 ? p.sizes.first : null,
+          exactVariant: p.colors.length <= 1 && p.sizes.length <= 1,
+        );
+      }
+    }
+    return null;
+  }
+
   // ---------------------------------------------------------------- BCV API
   Future<bool> syncBcvRate({String? source}) async {
     final targetSource = source ?? (settings.rateSource == 'Paralelo' ? 'Paralelo' : 'BCV Oficial');

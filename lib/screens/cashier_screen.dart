@@ -80,6 +80,8 @@ class _CashierPosViewState extends State<CashierPosView> {
   String _query = '';
   String? _catId;
   final List<CartItem> _saleItems = [];
+  final _scanCtrl = TextEditingController();
+  final _scanFocus = FocusNode();
 
   final _custForm = GlobalKey<FormState>();
   final _custName = TextEditingController();
@@ -94,6 +96,8 @@ class _CashierPosViewState extends State<CashierPosView> {
 
   @override
   void dispose() {
+    _scanCtrl.dispose();
+    _scanFocus.dispose();
     _custName.dispose();
     _custDoc.dispose();
     _custPhone.dispose();
@@ -136,6 +140,40 @@ class _CashierPosViewState extends State<CashierPosView> {
     if (res == null || res.isEmpty) return;
     for (final line in res) {
       _addToSale(p, color: line.color, size: line.size, qty: line.qty);
+    }
+  }
+
+  /// Procesa un código escaneado (pistola de barras o teclado + Enter) y agrega automáticamente
+  /// el producto con su color y talla exactos si corresponde a un código de variante.
+  Future<void> _handleBarcodeScan(AppState state, String raw) async {
+    final code = raw.trim();
+    if (code.isEmpty) return;
+    final match = state.resolveBarcode(code);
+    if (match == null) {
+      showSnack(context, 'Código "$code" no encontrado en el catálogo', error: true);
+      _scanCtrl.clear();
+      _scanFocus.requestFocus();
+      return;
+    }
+    _scanCtrl.clear();
+    if (match.exactVariant) {
+      if (_availableInSale(match.product, color: match.color) <= 0) {
+        showSnack(context, 'Sin stock disponible en ${match.color ?? match.product.name}', error: true);
+      } else {
+        _addToSale(match.product, color: match.color, size: match.size, qty: 1);
+        final variantLabel = [
+          if (match.color != null) match.color!,
+          if (match.size != null) 'Talla ${match.size}',
+        ].join(' / ');
+        showSnack(
+          context,
+          'Agregado: ${match.product.name}${variantLabel.isNotEmpty ? ' ($variantLabel)' : ''}',
+        );
+      }
+      _scanFocus.requestFocus();
+    } else {
+      await _openPicker(match.product);
+      if (mounted) _scanFocus.requestFocus();
     }
   }
 
@@ -237,7 +275,10 @@ class _CashierPosViewState extends State<CashierPosView> {
     final rate = state.settings.exchangeRate;
     final filtered = state.activeProducts.where((p) {
       if (_catId != null && p.categoryId != _catId) return false;
-      if (_query.isNotEmpty && !p.name.toLowerCase().contains(_query.toLowerCase())) return false;
+      if (_query.isNotEmpty) {
+        final q = _query.toLowerCase();
+        if (!p.name.toLowerCase().contains(q) && !p.sku.toLowerCase().contains(q)) return false;
+      }
       return true;
     }).toList();
 
@@ -257,9 +298,31 @@ class _CashierPosViewState extends State<CashierPosView> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
                 Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: _scanCtrl,
+                    focusNode: _scanFocus,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (v) => _handleBarcodeScan(state, v),
+                    decoration: InputDecoration(
+                      hintText: 'Escanear código de barras o SKU (ej. CAL-001-NEG-39) + Enter...',
+                      prefixIcon: const Icon(Icons.qr_code_scanner, color: NayColors.primary),
+                      suffixIcon: IconButton(
+                        tooltip: 'Agregar por código',
+                        icon: const Icon(Icons.add_circle, color: NayColors.primary),
+                        onPressed: () => _handleBarcodeScan(state, _scanCtrl.text),
+                      ),
+                      isDense: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
                   child: TextField(
                     decoration: InputDecoration(
-                      hintText: 'Buscar prenda o calzado para agregar a la venta...',
+                      hintText: 'Buscar por nombre o SKU...',
                       prefixIcon: const Icon(Icons.search),
                       isDense: true,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
@@ -347,6 +410,15 @@ class _CashierPosViewState extends State<CashierPosView> {
                               Padding(
                                 padding: const EdgeInsets.all(10),
                                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Text(
+                                    p.sku,
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontFamily: 'monospace',
+                                      color: NayColors.accent,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                   Text(p.name,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,

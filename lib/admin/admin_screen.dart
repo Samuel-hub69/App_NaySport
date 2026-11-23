@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../app_state.dart';
 import '../db.dart';
+import '../excel_export.dart';
 import '../format.dart';
 import '../models.dart';
 import '../pdf_export.dart';
@@ -465,7 +466,39 @@ class _InventoryTabState extends State<_InventoryTab> {
                 }
               },
             ),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.greenAccent.shade200,
+                side: BorderSide(color: Colors.green.shade400.withValues(alpha: 0.65)),
+              ),
+              icon: const Icon(Icons.table_chart_outlined),
+              label: const Text('Exportar Excel'),
+              onPressed: () async {
+                final bytes = ExcelExporter.buildInventoryAndKardexXlsx(state);
+                final path = await ExcelExporter.saveXlsx(bytes, 'Inventario_Kardex_NaySport.xlsx');
+                if (path != null && context.mounted) {
+                  showSnack(context, 'Excel detallado guardado (Inventario + Kardex)');
+                  WinUtils.open(path);
+                }
+              },
+            ),
           ] else ...[
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.greenAccent.shade200,
+                side: BorderSide(color: Colors.green.shade400.withValues(alpha: 0.65)),
+              ),
+              icon: const Icon(Icons.table_chart_outlined),
+              label: const Text('Exportar Excel'),
+              onPressed: () async {
+                final bytes = ExcelExporter.buildInventoryAndKardexXlsx(state);
+                final path = await ExcelExporter.saveXlsx(bytes, 'Inventario_Kardex_NaySport.xlsx');
+                if (path != null && context.mounted) {
+                  showSnack(context, 'Excel detallado guardado (Inventario + Kardex)');
+                  WinUtils.open(path);
+                }
+              },
+            ),
             TextButton.icon(
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               icon: const Icon(Icons.delete_sweep_outlined),
@@ -490,7 +523,12 @@ class _InventoryTabState extends State<_InventoryTab> {
   Widget _catalogList(AppState state) {
     final list = state.products.where((p) {
       if (_catFilter != null && p.categoryId != _catFilter) return false;
-      if (_query.isNotEmpty && !p.name.toLowerCase().contains(_query.toLowerCase())) return false;
+      if (_query.isNotEmpty) {
+        final q = _query.toLowerCase();
+        final matchesName = p.name.toLowerCase().contains(q);
+        final matchesSku = p.sku.toLowerCase().contains(q);
+        if (!matchesName && !matchesSku) return false;
+      }
       switch (_stockFilter) {
         case 'low':
           return p.stock > 0 && p.stock <= 5;
@@ -528,7 +566,34 @@ class _InventoryTabState extends State<_InventoryTab> {
               Expanded(
                 flex: 3,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: NayColors.surfaceElevated,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: NayColors.border),
+                      ),
+                      child: Text(
+                        p.sku,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                          color: NayColors.accent,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        p.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      ),
+                    ),
+                  ]),
                   Text(
                     '${state.categoryName(p.categoryId)}${p.costPrice > 0 ? ' • Costo: ${usd(p.costPrice)}' : ''}',
                     style: const TextStyle(color: NayColors.primary, fontSize: 12),
@@ -558,9 +623,10 @@ class _InventoryTabState extends State<_InventoryTab> {
                     onTap: () => _editStockQuick(context, p),
                     child: Chip(
                       backgroundColor: p.stock == 0
-                          ? Colors.red.shade100
-                          : (p.stock <= 5 ? Colors.orange.shade100 : Colors.green.shade100),
-                      label: Text('${p.stock} unid.', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ? Colors.red.shade900
+                          : (p.stock <= 5 ? Colors.orange.shade900 : Colors.green.shade900),
+                      label: Text('${p.stock} unid.',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                     ),
                   ),
                 ),
@@ -570,7 +636,12 @@ class _InventoryTabState extends State<_InventoryTab> {
                     onPressed: () => state.adjustStock(p, p.stock + 1),
                   ),
               ]),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
+              IconButton(
+                tooltip: 'Ver códigos de barras (SKU y variantes)',
+                icon: const Icon(Icons.qr_code_2, color: NayColors.accent),
+                onPressed: () => showAnimatedDialog(context: context, builder: (_) => _ProductBarcodesDialog(product: p)),
+              ),
               Tooltip(
                 message: p.active ? 'Visible en la tienda' : 'Oculto',
                 child: Switch(
@@ -767,6 +838,7 @@ class _ProductEditorDialog extends StatefulWidget {
 
 class _ProductEditorDialogState extends State<_ProductEditorDialog> {
   final _form = GlobalKey<FormState>();
+  late final TextEditingController _sku;
   late final TextEditingController _name;
   late final TextEditingController _desc;
   late final TextEditingController _cost;
@@ -779,19 +851,21 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
   late Map<String, TextEditingController> _colorCtrls;
   late bool _active;
   bool _costTouched = false;
+  bool _skuTouched = false;
 
   @override
   void initState() {
     super.initState();
     final p = widget.product;
     final state = AppScope.read(context);
+    _catId = p?.categoryId ?? (state.categories.isNotEmpty ? state.categories.first.id : 'casual');
+    _sku = TextEditingController(text: p?.sku ?? state.suggestNextSku(_catId));
     _name = TextEditingController(text: p?.name ?? '');
     _desc = TextEditingController(text: p?.description ?? '');
     _cost = TextEditingController(text: p != null && p.costPrice > 0 ? p.costPrice.toStringAsFixed(2) : '');
     _price = TextEditingController(text: p != null ? p.price.toStringAsFixed(2) : '');
     _stock = TextEditingController(text: '${p?.stock ?? 10}');
     _image = TextEditingController(text: p?.image ?? '');
-    _catId = p?.categoryId ?? (state.categories.isNotEmpty ? state.categories.first.id : 'casual');
     _selectedSizes = List<String>.from(p?.sizes ?? []);
     _colors = List<String>.from(p?.colors ?? []);
     _colorCtrls = {
@@ -799,10 +873,12 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
     };
     _active = p?.active ?? true;
     _costTouched = p != null && p.costPrice > 0;
+    _skuTouched = p != null;
   }
 
   @override
   void dispose() {
+    _sku.dispose();
     _name.dispose();
     _desc.dispose();
     _cost.dispose();
@@ -954,11 +1030,31 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
                 const SizedBox(width: 20),
                 Expanded(
                   child: Column(children: [
-                    TextFormField(
-                      controller: _name,
-                      decoration: const InputDecoration(labelText: 'Nombre del producto'),
-                      validator: (v) => (v ?? '').trim().isEmpty ? 'Requerido' : null,
-                    ),
+                    Row(children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextFormField(
+                          controller: _name,
+                          decoration: const InputDecoration(labelText: 'Nombre del producto'),
+                          validator: (v) => (v ?? '').trim().isEmpty ? 'Requerido' : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _sku,
+                          decoration: const InputDecoration(
+                            labelText: 'Código / SKU',
+                            prefixIcon: Icon(Icons.qr_code_2, size: 18),
+                          ),
+                          onChanged: (_) {
+                            _skuTouched = true;
+                            setState(() {});
+                          },
+                          validator: (v) => (v ?? '').trim().isEmpty ? 'Requerido' : null,
+                        ),
+                      ),
+                    ]),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _desc,
@@ -966,15 +1062,27 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
                       decoration: const InputDecoration(labelText: 'Descripción'),
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: state.categories.any((c) => c.id == _catId) ? _catId : null,
-                      decoration: const InputDecoration(labelText: 'Categoría'),
-                      items: [for (final c in state.categories) DropdownMenuItem(value: c.id, child: Text(c.name))],
-                      onChanged: (v) {
-                        if (v != null) setState(() => _catId = v);
-                      },
-                      validator: (v) => v == null ? 'Elige una categoría' : null,
-                    ),
+                    Row(children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: state.categories.any((c) => c.id == _catId) ? _catId : null,
+                          decoration: const InputDecoration(labelText: 'Categoría'),
+                          items: [for (final c in state.categories) DropdownMenuItem(value: c.id, child: Text(c.name))],
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() {
+                                _catId = v;
+                                if (!_skuTouched) _sku.text = state.suggestNextSku(v);
+                              });
+                            }
+                          },
+                          validator: (v) => v == null ? 'Elige una categoría' : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      if (_sku.text.trim().isNotEmpty)
+                        BarcodeDisplay(code: _sku.text.trim().toUpperCase(), height: 32, width: 175),
+                    ]),
                   ]),
                 ),
               ]),
@@ -1174,6 +1282,7 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
             if (widget.product == null) {
               final prod = Product(
                 id: state.newId('p'),
+                sku: _sku.text.trim().toUpperCase(),
                 name: _name.text.trim(),
                 description: _desc.text.trim(),
                 price: price,
@@ -1201,6 +1310,7 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
               final p = widget.product!;
               final oldMap = Map<String, int>.from(p.colorStock);
               final hadColors = p.colors.isNotEmpty;
+              p.sku = _sku.text.trim().toUpperCase();
               p.name = _name.text.trim();
               p.description = _desc.text.trim();
               p.price = price;
@@ -1227,6 +1337,123 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
           },
           child: const Text('Guardar'),
         ),
+      ],
+    );
+  }
+}
+
+/// Diálogo con el código de barras base y los códigos por variante (color + talla) estilo supermercado.
+class _ProductBarcodesDialog extends StatelessWidget {
+  final Product product;
+  const _ProductBarcodesDialog({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    final variants = product.allVariantCodes();
+    return AlertDialog(
+      title: Row(children: [
+        const Icon(Icons.qr_code_2, color: NayColors.primary),
+        const SizedBox(width: 8),
+        Expanded(child: Text('Códigos de barras — ${product.name}', overflow: TextOverflow.ellipsis)),
+      ]),
+      content: SizedBox(
+        width: 680,
+        height: 460,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: NayColors.surfaceElevated,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: NayColors.border),
+            ),
+            child: Row(children: [
+              BarcodeDisplay(code: product.sku, height: 42, width: 185),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Código general del producto (SKU)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Escanea el código de una variante abajo en Caja / Ventas para agregar automáticamente el producto con su color y talla exactos.',
+                    style: TextStyle(fontSize: 12, color: NayColors.textMuted),
+                  ),
+                ]),
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.copy, size: 16),
+                label: const Text('Copiar SKU'),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: product.sku));
+                  showSnack(context, 'Código ${product.sku} copiado');
+                },
+              ),
+            ]),
+          ),
+          const SizedBox(height: 14),
+          Text('Códigos por variante (${variants.length}):', style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Expanded(
+            child: ListView.separated(
+              itemCount: variants.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              itemBuilder: (_, i) {
+                final v = variants[i];
+                final stock = product.stockForColor(v.color);
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: NayColors.surfaceElevated,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: NayColors.border),
+                  ),
+                  child: Row(children: [
+                    BarcodeDisplay(code: v.code, height: 34, width: 205),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          if (v.color != null) ...[
+                            ColorDot(v.color!, size: 14),
+                            const SizedBox(width: 6),
+                            Text(v.color!, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          ] else
+                            const Text('General', style: TextStyle(fontWeight: FontWeight.w600)),
+                          if (v.size != null) ...[
+                            const SizedBox(width: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: NayColors.primary.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text('Talla ${v.size}', style: const TextStyle(fontSize: 11.5)),
+                            ),
+                          ],
+                        ]),
+                        const SizedBox(height: 4),
+                        Text('Stock en este color: $stock unid.',
+                            style: const TextStyle(fontSize: 12, color: NayColors.textMuted)),
+                      ]),
+                    ),
+                    IconButton(
+                      tooltip: 'Copiar código ${v.code}',
+                      icon: const Icon(Icons.copy_outlined, size: 20, color: NayColors.accent),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: v.code));
+                        showSnack(context, 'Código ${v.code} copiado — listo para pegar o escanear en Caja');
+                      },
+                    ),
+                  ]),
+                );
+              },
+            ),
+          ),
+        ]),
+      ),
+      actions: [
+        FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
       ],
     );
   }

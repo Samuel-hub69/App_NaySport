@@ -64,6 +64,7 @@ class CategoryModel {
 
 class Product {
   final String id;
+  String sku; // código único base estilo supermercado (ej. CAL-001)
   String name;
   String description;
   double price; // precio de venta en USD
@@ -78,6 +79,7 @@ class Product {
 
   Product({
     required this.id,
+    String? sku,
     required this.name,
     required this.description,
     required this.price,
@@ -89,9 +91,83 @@ class Product {
     Map<String, int>? colorStock,
     int stock = 20,
     this.active = true,
-  })  : costPrice = costPrice ?? (price > 5 ? double.parse((price - 5).toStringAsFixed(2)) : 0),
+  })  : sku = (sku != null && sku.trim().isNotEmpty)
+            ? sku.trim().toUpperCase()
+            : generateSku(categoryId, id),
+        costPrice = costPrice ?? (price > 5 ? double.parse((price - 5).toStringAsFixed(2)) : 0),
         colorStock = _buildColorStock(colors, colorStock, stock),
         _generalStock = stock;
+
+  static String _stripAccents(String input) {
+    const map = {
+      'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u', 'ü': 'u', 'ñ': 'n',
+      'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U', 'Ü': 'U', 'Ñ': 'N',
+    };
+    final buf = StringBuffer();
+    for (final ch in input.split('')) {
+      buf.write(map[ch] ?? ch);
+    }
+    return buf.toString();
+  }
+
+  static String generateSku(String categoryId, String id) {
+    final cleanCat = _stripAccents(categoryId).toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    final prefix = cleanCat.length >= 3 ? cleanCat.substring(0, 3) : cleanCat.padRight(3, 'X');
+    final digits = id.replaceAll(RegExp(r'[^0-9]'), '');
+    final numPart = digits.isNotEmpty
+        ? (digits.length > 4 ? digits.substring(digits.length - 4) : digits.padLeft(3, '0'))
+        : (id.hashCode.abs() % 900 + 100).toString();
+    return '$prefix-$numPart';
+  }
+
+  static String colorToken(String color) {
+    final clean = _stripAccents(color).toUpperCase().replaceAll(RegExp(r'[^A-Z0-9 ]'), '').trim();
+    if (clean.isEmpty) return 'CLR';
+    final words = clean.split(RegExp(r'\s+'));
+    if (words.length >= 2) {
+      final a = words[0].length >= 2 ? words[0].substring(0, 2) : words[0];
+      final b = words[1].substring(0, 1);
+      return '$a$b';
+    }
+    return clean.length >= 3 ? clean.substring(0, 3) : clean;
+  }
+
+  static String sizeToken(String size) =>
+      _stripAccents(size).toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+
+  /// Código escaneable específico por variante (color y talla), ej: CAL-001-NEG-39.
+  String variantCode({String? color, String? size}) {
+    final parts = <String>[sku];
+    if (color != null && color.trim().isNotEmpty) parts.add(colorToken(color));
+    if (size != null && size.trim().isNotEmpty) {
+      final st = sizeToken(size);
+      if (st.isNotEmpty) parts.add(st);
+    }
+    return parts.join('-');
+  }
+
+  /// Lista todas las variantes (color + talla) con su código escaneable individual.
+  List<({String code, String? color, String? size})> allVariantCodes() {
+    final out = <({String code, String? color, String? size})>[];
+    if (colors.isEmpty && sizes.isEmpty) {
+      out.add((code: sku, color: null, size: null));
+    } else if (colors.isEmpty) {
+      for (final s in sizes) {
+        out.add((code: variantCode(size: s), color: null, size: s));
+      }
+    } else if (sizes.isEmpty) {
+      for (final c in colors) {
+        out.add((code: variantCode(color: c), color: c, size: null));
+      }
+    } else {
+      for (final c in colors) {
+        for (final s in sizes) {
+          out.add((code: variantCode(color: c, size: s), color: c, size: s));
+        }
+      }
+    }
+    return out;
+  }
 
   static Map<String, int> _buildColorStock(
       List<String> colors, Map<String, int>? explicit, int fallbackTotal) {
@@ -154,6 +230,7 @@ class Product {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'sku': sku,
         'name': name,
         'description': description,
         'price': price,
@@ -172,6 +249,7 @@ class Product {
     final parsedMap = rawMap?.map((k, v) => MapEntry(k, (v as num).toInt()));
     return Product(
       id: j['id'],
+      sku: j['sku'] as String?,
       name: j['name'],
       description: j['description'] ?? '',
       price: (j['price'] as num).toDouble(),
