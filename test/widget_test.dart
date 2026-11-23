@@ -200,7 +200,7 @@ void main() {
     expect(xlsxText, contains('CAL-001-NEG'));
   });
 
-  testWidgets('Caja física exige datos del cliente y muestra solo los 4 métodos físicos', (tester) async {
+  testWidgets('Caja física oculta Venta actual hasta agregar producto y abre modal al tocar Comprar', (tester) async {
     tester.view.physicalSize = const Size(1400, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -218,10 +218,24 @@ void main() {
     );
     await tester.pump();
 
+    // Sin productos agregados, Venta actual no ocupa espacio fijo en pantalla
+    expect(find.text('Datos del cliente'), findsNothing);
     expect(find.text('Cliente de mostrador'), findsNothing);
     expect(find.text('Transferencia bancaria'), findsNothing);
-    expect(find.text('Punto de Venta'), findsOneWidget);
 
+    // Escanear una variante para agregar 1 producto y mostrar el botón flotante "Comprar"
+    await tester.enterText(
+      find.byWidgetPredicate((w) => w is TextField && (w.decoration?.hintText?.contains('Escanear') ?? false)),
+      'CAL-001-NEG-39',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Comprar'), findsOneWidget);
+    await tester.tap(find.text('Comprar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Punto de Venta'), findsOneWidget);
     expect(find.text('Datos del cliente'), findsOneWidget);
     expect(find.text('Nombre completo y apellido'), findsOneWidget);
     expect(find.text('Cédula'), findsOneWidget);
