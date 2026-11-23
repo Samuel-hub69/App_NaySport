@@ -636,10 +636,15 @@ class _CashierPosViewState extends State<CashierPosView> {
                   decoration: InputDecoration(
                     hintText: 'Escanear código de barras o SKU (ej. CAL-001-NEG-39) + Enter...',
                     prefixIcon: const Icon(Icons.qr_code_scanner, color: NayColors.primary),
-                    suffixIcon: IconButton(
-                      tooltip: 'Agregar por código',
-                      icon: const Icon(Icons.add_circle, color: NayColors.primary),
-                      onPressed: () => _handleBarcodeScan(state, _scanCtrl.text),
+                    suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _scanCtrl,
+                      builder: (_, value, _) => value.text.trim().isEmpty
+                          ? const SizedBox.shrink()
+                          : IconButton(
+                              tooltip: 'Agregar por código',
+                              icon: const Icon(Icons.add_circle, color: NayColors.primary),
+                              onPressed: () => _handleBarcodeScan(state, _scanCtrl.text),
+                            ),
                     ),
                     isDense: true,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
