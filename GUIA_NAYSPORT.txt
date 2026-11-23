@@ -22,13 +22,17 @@
 Al abrir la app después de la pantalla de carga aparece el Inicio de Sesión:
 - Si entras como ADMINISTRADOR -> entras al Panel Admin completo.
 - Si entras como CAJERO        -> entras directo a Caja / Ventas (tienda física).
+- Si entras como ALMACENISTA   -> entras al Panel de Almacén (Stock y Kardex,
+                                  Proveedores y Categorías).
 - Si entras como CLIENTE       -> entras a la tienda online.
 - Si tocas "Ver tienda sin cuenta (Visitante)" -> puedes mirar todo el catálogo
   sin registrarte (y solo te pide iniciar sesión si vas a pagar).
 
-Credenciales de prueba incluidas:
-- Administrador: admin@naysport.com  /  Admin2026!
-- Cajero:        cajero@naysport.com /  Cajero2026!
+Credenciales de acceso iniciales (Usuario / Contraseña):
+- Administrador: admin   /  Admin2026!
+- Cajero:        cajero  /  Cajero2026!
+  (También puedes crear usuarios con rol Cajero, Almacenista o Administrador
+   desde Panel Admin -> Config y BCV -> Equipo y Usuarios).
 
 2. CÓMO FUNCIONA LA TIENDA ONLINE (VISTA DEL CLIENTE)
 --------------------------------------------------------------------------------
@@ -53,16 +57,17 @@ Credenciales de prueba incluidas:
 --------------------------------------------------------------------------------
 Al iniciar sesión con una cuenta de Cajero:
 - Pestaña [Caja / Ventas]:
-  * Seleccionas las prendas que el cliente lleva (puedes combinar colores y
-    tallas; muestra el stock exacto de cada color).
+  * El catálogo se muestra a pantalla completa; puedes buscar, filtrar por
+    categoría o escanear código de barras / SKU.
+  * Al agregar al menos 1 prenda aparece el botón flotante "Comprar" abajo en el
+    centro; al tocarlo se abre la ventana de "Venta actual".
   * Si el cliente lleva 3 o más artículos en su compra (incluso modelos o
     zapatos distintos), aplica el descuento automático configurado por el Admin.
   * Siempre se solicitan los datos del cliente (Nombre completo y apellido,
     Cédula de hasta 10 dígitos, Teléfono y Dirección) para mantener el registro
     de la compra.
-  * Métodos de pago físicos: Punto de Venta (sin campos extra), Pago Móvil
-    (con N° de referencia), Zelle, Efectivo ($) y Efectivo (Bs). Muestra el
-    total en $ y en Bs.
+  * Métodos de pago físicos: Punto de Venta, Pago Móvil (con N° de referencia),
+    Zelle, Efectivo ($) y Efectivo (Bs). Muestra el total en $ y en Bs.
   * Al darle a "Cobrar y registrar venta", descuenta el stock por color, registra
     la salida en el Kardex y permite imprimir el comprobante.
 - Pestaña [Mis ventas de hoy]:
@@ -125,8 +130,9 @@ Al iniciar sesión con una cuenta de Cajero:
   - API BCV en vivo (BCV Oficial y Paralelo vía ve.dolarapi.com) + tasa manual.
   - Costo y mínimo de envío gratis.
   - Reglas de descuento por cantidad (por defecto 3+ -5%, 5+ -10%, 10+ -15%).
-  - "Personal de Caja (Cajeros)": crear nuevas cuentas de cajero, activar o
-    desactivar cajeros o eliminarlos.
+  - "Equipo y Usuarios": botón "+ Nuevo usuario" para registrar cuentas con
+    nombre de usuario y rol asignado (Cajero, Almacenista o Administrador),
+    activar/desactivar cuentas o eliminarlas.
   - Seguridad: ver carpeta de BD local (naysport_db.json), cambiar contraseña
     admin y restablecer catálogo inicial.
 ================================================================================
