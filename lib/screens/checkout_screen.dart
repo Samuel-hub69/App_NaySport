@@ -148,7 +148,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Chip(
               backgroundColor: NayColors.logoBg,
               label: Text('Pedido ${order.id}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: NayColors.dark)),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: NayColors.accent)),
             ),
             const SizedBox(height: 12),
             Text(
@@ -793,7 +793,7 @@ class _ConfirmBlock extends StatelessWidget {
       decoration: BoxDecoration(
         color: NayColors.bg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.pink.shade100),
+        border: Border.all(color: NayColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [

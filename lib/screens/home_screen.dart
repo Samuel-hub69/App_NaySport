@@ -138,19 +138,14 @@ class _HomeScreenState extends State<HomeScreen> {
             onSelect: (c) => setState(() => _selected = c),
           ),
           Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 240),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, anim) => FadeTransition(
-                opacity: anim,
-                child: SlideTransition(
-                  position: Tween<Offset>(begin: const Offset(0, 0.025), end: Offset.zero).animate(anim),
-                  child: child,
-                ),
-              ),
+            child: TweenAnimationBuilder<double>(
+              key: ValueKey('cat_${_selected ?? 'all'}'),
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              builder: (_, v, child) => Opacity(opacity: v, child: child),
               child: CustomScrollView(
-                key: ValueKey('cat_${_selected ?? 'all'}'),
+                cacheExtent: 260,
                 slivers: [
                   if (_selected == null && _query.isEmpty) const SliverToBoxAdapter(child: _HeroBanner()),
                   SliverPadding(
@@ -205,7 +200,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           childAspectRatio: 0.62,
                         ),
                         delegate: SliverChildBuilderDelegate(
-                          (_, i) => ProductCard(product: filtered[i]),
+                          (_, i) {
+                            final prod = filtered[i];
+                            return ProductCard(
+                              key: ValueKey(prod.id),
+                              product: prod,
+                              rate: state.settings.exchangeRate,
+                              categoryName: state.categoryName(prod.categoryId),
+                              categoryIcon: state.categoryIcon(prod.categoryId),
+                            );
+                          },
                           childCount: filtered.length,
                         ),
                       ),
@@ -349,15 +353,6 @@ class _CategorySidebarItemState extends State<_CategorySidebarItem> {
                       ? NayColors.primary
                       : (active ? NayColors.primary.withValues(alpha: 0.85) : Colors.transparent),
                 ),
-                boxShadow: hovered
-                    ? [
-                        BoxShadow(
-                          color: NayColors.primary.withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ]
-                    : null,
               ),
               child: Row(children: [
                 Icon(widget.icon, size: 20, color: fgColor),
@@ -439,7 +434,16 @@ class _HeroBanner extends StatelessWidget {
 
 class ProductCard extends StatefulWidget {
   final Product product;
-  const ProductCard({super.key, required this.product});
+  final double? rate;
+  final String? categoryName;
+  final IconData? categoryIcon;
+  const ProductCard({
+    super.key,
+    required this.product,
+    this.rate,
+    this.categoryName,
+    this.categoryIcon,
+  });
 
   @override
   State<ProductCard> createState() => _ProductCardState();
@@ -450,28 +454,25 @@ class _ProductCardState extends State<ProductCard> {
 
   @override
   Widget build(BuildContext context) {
-    final state = AppScope.of(context);
     final product = widget.product;
     final soldOut = product.stock <= 0;
+    final catName = widget.categoryName ?? AppScope.read(context).categoryName(product.categoryId);
+    final catIcon = widget.categoryIcon ?? AppScope.read(context).categoryIcon(product.categoryId);
     void open() => showAnimatedDialog(context: context, builder: (_) => ProductDialog(product: product));
     return RepaintBoundary(
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+          duration: const Duration(milliseconds: 140),
           curve: Curves.easeOut,
-          transform: Matrix4.translationValues(0, _hovered ? -4 : 0, 0),
           decoration: BoxDecoration(
             color: NayColors.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: _hovered ? NayColors.primary.withValues(alpha: 0.7) : NayColors.border,
-              width: _hovered ? 1.4 : 1,
+              color: _hovered ? NayColors.primary : NayColors.border,
+              width: _hovered ? 1.5 : 1,
             ),
-            boxShadow: _hovered
-                ? [BoxShadow(color: NayColors.primary.withValues(alpha: 0.22), blurRadius: 18, offset: const Offset(0, 6))]
-                : null,
           ),
           clipBehavior: Clip.antiAlias,
           child: Material(
@@ -485,8 +486,8 @@ class _ProductCardState extends State<ProductCard> {
                     child: Stack(fit: StackFit.expand, children: [
                       ProductImage(
                         product.image,
-                        fallbackIcon: state.categoryIcon(product.categoryId),
-                        cacheWidth: 420,
+                        fallbackIcon: catIcon,
+                        cacheWidth: 300,
                       ),
                       if (soldOut)
                         Container(
@@ -517,7 +518,7 @@ class _ProductCardState extends State<ProductCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(state.categoryName(product.categoryId).toUpperCase(),
+                        Text(catName.toUpperCase(),
                             style: const TextStyle(fontSize: 11, color: NayColors.primary, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
                         Text(product.name,
@@ -536,7 +537,7 @@ class _ProductCardState extends State<ProductCard> {
                         ],
                         const SizedBox(height: 6),
                         Row(children: [
-                          Expanded(child: PriceText(product.price, fontSize: 16)),
+                          Expanded(child: PriceText(product.price, fontSize: 16, rateOverride: widget.rate)),
                           IconButton.filledTonal(
                             style: IconButton.styleFrom(
                               backgroundColor: NayColors.primary.withValues(alpha: 0.2),
@@ -643,13 +644,28 @@ class _ProductDialogState extends State<ProductDialog> {
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: SizedBox(
-        width: 880,
-        height: 620,
+        width: 860,
+        height: 600,
         child: Row(children: [
-          SizedBox(
-            width: 360,
+          Container(
+            width: 310,
             height: double.infinity,
-            child: ProductImage(p.image, fallbackIcon: state.categoryIcon(p.categoryId)),
+            color: const Color(0xFF130B10),
+            padding: const EdgeInsets.all(20),
+            child: Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: AspectRatio(
+                  aspectRatio: 0.85,
+                  child: ProductImage(
+                    p.image,
+                    cacheWidth: 640,
+                    fit: BoxFit.contain,
+                    fallbackIcon: state.categoryIcon(p.categoryId),
+                  ),
+                ),
+              ),
+            ),
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -687,10 +703,10 @@ class _ProductDialogState extends State<ProductDialog> {
                         : (availableTotal > 0 ? 'Disponibles en total: $availableTotal' : 'Sin stock disponible'),
                     style: TextStyle(
                       color: (p.colors.isNotEmpty && _color != null ? colorRemaining : availableTotal) > 0
-                          ? Colors.green.shade700
-                          : Colors.red,
+                          ? Colors.greenAccent.shade200
+                          : Colors.redAccent,
                       fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   if (p.colors.isNotEmpty) ...[
@@ -747,16 +763,6 @@ class _ProductDialogState extends State<ProductDialog> {
                       icon: const Icon(Icons.add),
                       onPressed: safeQty < colorRemaining ? () => setState(() => _qty = safeQty + 1) : null,
                     ),
-                    if (canCombine && colorRemaining > 0) ...[
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          icon: const Icon(Icons.add_circle_outline, size: 18),
-                          label: const Text('Añadir y elegir otro color/talla'),
-                          onPressed: () => _addVariantAndChooseAnother(colorRemaining),
-                        ),
-                      ),
-                    ],
                   ]),
                   if (_bundle.isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -788,25 +794,51 @@ class _ProductDialogState extends State<ProductDialog> {
                     ),
                   ],
                   if (rules.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Wrap(spacing: 6, runSpacing: 6, children: [
+                    const SizedBox(height: 14),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
                       for (final r in rules)
-                        Chip(
-                          visualDensity: VisualDensity.compact,
-                          backgroundColor: inCart + totalSelected >= r.minQty ? Colors.green.shade100 : Colors.pink.shade50,
-                          label: Text('${r.minQty}+ unid: -${r.percent.toStringAsFixed(0)}%',
-                              style: const TextStyle(fontSize: 12)),
-                        ),
+                        Builder(builder: (_) {
+                          final active = inCart + totalSelected >= r.minQty;
+                          return Chip(
+                            visualDensity: VisualDensity.compact,
+                            backgroundColor: active
+                                ? Colors.green.shade900.withValues(alpha: 0.9)
+                                : NayColors.surfaceElevated,
+                            side: BorderSide(
+                              color: active ? Colors.greenAccent.shade200 : NayColors.primary.withValues(alpha: 0.55),
+                            ),
+                            label: Text(
+                              '${r.minQty}+ unid: -${r.percent.toStringAsFixed(0)}%',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: active ? Colors.greenAccent.shade100 : NayColors.accent,
+                              ),
+                            ),
+                          );
+                        }),
                     ]),
                   ],
-                  const SizedBox(height: 14),
-                  if (pct > 0)
+                  if (pct > 0) ...[
+                    const SizedBox(height: 12),
                     Text(
                       '¡Descuento de ${pct.toStringAsFixed(0)}% aplicado por llevar $totalSelected unidades! '
                       'Pagas ${usd(gross * (1 - pct / 100))} en vez de ${usd(gross)}',
-                      style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: Colors.greenAccent.shade200, fontWeight: FontWeight.w600),
                     ),
-                  const SizedBox(height: 14),
+                  ],
+                  if (canCombine && colorRemaining > 0) ...[
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.add_circle_outline, size: 18, color: NayColors.accent),
+                        label: const Text('Añadir y elegir otro color o talla'),
+                        onPressed: () => _addVariantAndChooseAnother(colorRemaining),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(

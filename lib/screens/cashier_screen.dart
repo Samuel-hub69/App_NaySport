@@ -45,7 +45,7 @@ class _CashierScreenState extends State<CashierScreen> {
           ),
           const SizedBox(width: 12),
           Chip(
-            avatar: const Icon(Icons.badge_outlined, size: 16, color: NayColors.dark),
+            avatar: const Icon(Icons.badge_outlined, size: 16, color: NayColors.accent),
             label: Text('Cajero: ${user?.name ?? ''}'),
           ),
           const SizedBox(width: 8),
@@ -244,7 +244,7 @@ class _CashierPosViewState extends State<CashierPosView> {
           Chip(
             backgroundColor: NayColors.logoBg,
             label: Text('Comprobante ${order.id}',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: NayColors.dark)),
+                style: const TextStyle(fontWeight: FontWeight.bold, color: NayColors.accent)),
           ),
           const SizedBox(height: 10),
           Text('Total cobrado: ${usd(order.total)}',
@@ -360,6 +360,7 @@ class _CashierPosViewState extends State<CashierPosView> {
             child: filtered.isEmpty
                 ? const Center(child: Text('No hay productos con ese filtro'))
                 : GridView.builder(
+                    cacheExtent: 200,
                     padding: const EdgeInsets.all(20),
                     gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                       maxCrossAxisExtent: 230,
@@ -387,7 +388,7 @@ class _CashierPosViewState extends State<CashierPosView> {
                                 child: Stack(fit: StackFit.expand, children: [
                                   ProductImage(
                                     p.image,
-                                    cacheWidth: 360,
+                                    cacheWidth: 260,
                                     fallbackIcon: state.categoryIcon(p.categoryId),
                                   ),
                                   Positioned(
@@ -426,7 +427,7 @@ class _CashierPosViewState extends State<CashierPosView> {
                                           fontWeight: FontWeight.bold, fontSize: 13.5, color: Colors.white)),
                                   const SizedBox(height: 4),
                                   Row(children: [
-                                    Expanded(child: PriceText(p.price, fontSize: 14.5)),
+                                    Expanded(child: PriceText(p.price, fontSize: 14.5, rateOverride: rate)),
                                     Icon(Icons.add_circle, color: avail > 0 ? NayColors.primary : Colors.grey, size: 26),
                                   ]),
                                 ]),

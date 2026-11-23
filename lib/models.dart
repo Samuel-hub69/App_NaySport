@@ -560,6 +560,7 @@ class Order {
 class Supplier {
   final String id;
   String name;
+  String rif;
   String phone;
   String email;
   String city;
@@ -570,6 +571,7 @@ class Supplier {
   Supplier({
     required this.id,
     required this.name,
+    this.rif = '',
     required this.phone,
     this.email = '',
     this.city = '',
@@ -581,6 +583,7 @@ class Supplier {
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
+        'rif': rif,
         'phone': phone,
         'email': email,
         'city': city,
@@ -592,6 +595,7 @@ class Supplier {
   factory Supplier.fromJson(Map<String, dynamic> j) => Supplier(
         id: j['id'],
         name: j['name'],
+        rif: j['rif'] ?? '',
         phone: j['phone'] ?? '',
         email: j['email'] ?? '',
         city: j['city'] ?? '',
@@ -604,7 +608,9 @@ class Supplier {
 class PurchaseLine {
   final String productId;
   final String productName;
+  final String? sku;
   final String? color;
+  final String? size;
   final int qty;
   final double unitCost;
   final String? note;
@@ -612,7 +618,9 @@ class PurchaseLine {
   PurchaseLine({
     required this.productId,
     required this.productName,
+    this.sku,
     this.color,
+    this.size,
     required this.qty,
     required this.unitCost,
     this.note,
@@ -623,7 +631,9 @@ class PurchaseLine {
   Map<String, dynamic> toJson() => {
         'productId': productId,
         'productName': productName,
+        'sku': sku,
         'color': color,
+        'size': size,
         'qty': qty,
         'unitCost': unitCost,
         'note': note,
@@ -632,7 +642,9 @@ class PurchaseLine {
   factory PurchaseLine.fromJson(Map<String, dynamic> j) => PurchaseLine(
         productId: j['productId'] ?? '',
         productName: j['productName'],
+        sku: j['sku'],
         color: j['color'],
+        size: j['size'],
         qty: j['qty'],
         unitCost: (j['unitCost'] as num).toDouble(),
         note: j['note'],

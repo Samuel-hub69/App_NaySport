@@ -213,8 +213,8 @@ class NayLogo extends StatelessWidget {
   }
 }
 
-/// Nombre de la tienda en letra cursiva con brillo rosado animado opcional.
-class BrandName extends StatefulWidget {
+/// Nombre de la tienda en letra cursiva con gradiente rosado elegante y entrada animada ligera (sin bucle GPU continuo).
+class BrandName extends StatelessWidget {
   final double fontSize;
   final Color color;
   final bool animated;
@@ -226,71 +226,29 @@ class BrandName extends StatefulWidget {
   });
 
   @override
-  State<BrandName> createState() => _BrandNameState();
-}
-
-class _BrandNameState extends State<BrandName> with SingleTickerProviderStateMixin {
-  late final AnimationController _shimmer = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2800),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.animated) _shimmer.repeat();
-  }
-
-  @override
-  void didUpdateWidget(covariant BrandName oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.animated && !_shimmer.isAnimating) {
-      _shimmer.repeat();
-    } else if (!widget.animated && _shimmer.isAnimating) {
-      _shimmer.stop();
-    }
-  }
-
-  @override
-  void dispose() {
-    _shimmer.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final text = Text(
       'NaySport',
       style: TextStyle(
         fontFamily: 'GreatVibes',
-        fontSize: widget.fontSize,
-        color: widget.animated ? Colors.white : widget.color,
+        fontSize: fontSize,
         height: 1.1,
+        foreground: Paint()
+          ..shader = const LinearGradient(
+            colors: [NayColors.primary, Color(0xFFFFD6E8), NayColors.accent],
+          ).createShader(Rect.fromLTWH(0, 0, fontSize * 4.2, fontSize * 1.2)),
       ),
     );
-    if (!widget.animated) return text;
-    return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _shimmer,
-        builder: (_, child) {
-          final slide = (_shimmer.value * 2.6) - 0.8;
-          return ShaderMask(
-            blendMode: BlendMode.srcIn,
-            shaderCallback: (bounds) => LinearGradient(
-              begin: Alignment(slide - 0.6, 0),
-              end: Alignment(slide + 0.6, 0),
-              colors: const [
-                NayColors.primary,
-                Color(0xFFFFE3EF),
-                NayColors.accent,
-                NayColors.primary,
-              ],
-            ).createShader(bounds),
-            child: child,
-          );
-        },
-        child: text,
+    if (!animated) return text;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 550),
+      curve: Curves.easeOutCubic,
+      builder: (_, v, child) => Opacity(
+        opacity: v,
+        child: Transform.translate(offset: Offset(0, 6 * (1 - v)), child: child),
       ),
+      child: text,
     );
   }
 }
@@ -313,11 +271,13 @@ class ProductImage extends StatelessWidget {
   final String src;
   final IconData fallbackIcon;
   final int cacheWidth;
+  final BoxFit fit;
   const ProductImage(
     this.src, {
     super.key,
     this.fallbackIcon = Icons.checkroom,
-    this.cacheWidth = 480,
+    this.cacheWidth = 320,
+    this.fit = BoxFit.cover,
   });
 
   Widget _fallback() => Container(
@@ -334,7 +294,7 @@ class ProductImage extends StatelessWidget {
     if (src.startsWith('http')) {
       return Image.network(
         src,
-        fit: BoxFit.cover,
+        fit: fit,
         cacheWidth: cacheWidth,
         gaplessPlayback: true,
         filterQuality: FilterQuality.medium,
@@ -351,7 +311,7 @@ class ProductImage extends StatelessWidget {
     if (src.startsWith('assets/')) {
       return Image.asset(
         src,
-        fit: BoxFit.cover,
+        fit: fit,
         cacheWidth: cacheWidth,
         gaplessPlayback: true,
         filterQuality: FilterQuality.medium,
@@ -360,7 +320,7 @@ class ProductImage extends StatelessWidget {
     }
     return Image.file(
       File(src),
-      fit: BoxFit.cover,
+      fit: fit,
       cacheWidth: cacheWidth,
       gaplessPlayback: true,
       filterQuality: FilterQuality.medium,
@@ -388,12 +348,19 @@ class PriceText extends StatelessWidget {
   final double fontSize;
   final Color? color;
   final CrossAxisAlignment align;
-  const PriceText(this.usdValue,
-      {super.key, this.fontSize = 17, this.color, this.align = CrossAxisAlignment.start});
+  final double? rateOverride;
+  const PriceText(
+    this.usdValue, {
+    super.key,
+    this.fontSize = 17,
+    this.color,
+    this.align = CrossAxisAlignment.start,
+    this.rateOverride,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final rate = AppScope.of(context).settings.exchangeRate;
+    final rate = rateOverride ?? AppScope.of(context).settings.exchangeRate;
     return Column(crossAxisAlignment: align, mainAxisSize: MainAxisSize.min, children: [
       Text(usd(usdValue), style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: color ?? Colors.white)),
       Text(bs(usdValue, rate), style: TextStyle(fontSize: fontSize * 0.7, color: NayColors.textMuted)),
@@ -411,11 +378,12 @@ class ColorDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scopeHex = context.dependOnInheritedWidgetOfExactType<AppScope>()?.notifier?.colorHexFor(colorName);
-    final hex = hexOverride ?? scopeHex ?? kColorPalette[colorName] ?? 0xFFCCCCCC;
+    final hex = hexOverride ??
+        kColorPalette[colorName] ??
+        context.getInheritedWidgetOfExactType<AppScope>()?.notifier?.colorHexFor(colorName) ??
+        0xFFCCCCCC;
     final c = Color(hex);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
+    return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
@@ -426,9 +394,8 @@ class ColorDot extends StatelessWidget {
             : null,
         border: Border.all(
           color: selected ? NayColors.primary : Colors.white.withValues(alpha: 0.35),
-          width: selected ? 3 : 1,
+          width: selected ? 2.5 : 1,
         ),
-        boxShadow: selected ? [BoxShadow(color: NayColors.primary.withValues(alpha: 0.5), blurRadius: 8)] : null,
       ),
     );
   }

@@ -414,14 +414,30 @@ class AppState extends ChangeNotifier {
     for (final line in lines) {
       final p = productById(line.productId);
       if (p != null) {
-        final targetColor = line.color ?? (p.colors.isNotEmpty ? p.colors.first : null);
+        if (line.sku != null && line.sku!.trim().isNotEmpty) {
+          p.sku = line.sku!.trim().toUpperCase();
+        }
+        final targetColor = line.color != null && line.color!.trim().isNotEmpty
+            ? line.color!.trim()
+            : (p.colors.isNotEmpty ? p.colors.first : null);
+        if (targetColor != null && !p.colors.contains(targetColor)) {
+          p.colors = [...p.colors, targetColor];
+          p.colorStock[targetColor] = 0;
+        }
+        if (line.size != null && line.size!.trim().isNotEmpty && !p.sizes.contains(line.size!.trim())) {
+          p.sizes = [...p.sizes, line.size!.trim()];
+        }
         p.addStockForColor(targetColor, line.qty);
         if (line.unitCost > 0) p.costPrice = line.unitCost;
+        final variantInfo = [
+          if (targetColor != null) targetColor,
+          if (line.size != null && line.size!.isNotEmpty) 'Talla ${line.size}',
+        ].join(' / ');
         _logMovement(
           p,
           'entrada',
           line.qty,
-          'Proveedor: ${supplier.name}${targetColor != null ? ' ($targetColor)' : ''}${invoiceRef.isNotEmpty ? ' [Fact. $invoiceRef]' : ''}',
+          'Proveedor: ${supplier.name}${variantInfo.isNotEmpty ? ' ($variantInfo)' : ''}${invoiceRef.isNotEmpty ? ' [Fact. $invoiceRef]' : ''}',
         );
       }
     }

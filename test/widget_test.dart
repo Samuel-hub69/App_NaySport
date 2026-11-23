@@ -107,15 +107,28 @@ void main() {
     await state.removeSize('calzado', '34');
     expect(state.availableSizesForCategory('calzado'), isNot(contains('34')));
 
-    final sup = Supplier(id: 'sup1', name: 'Textiles Caracas', phone: '04141234567');
+    final sup = Supplier(id: 'sup1', name: 'Textiles Caracas', rif: 'J-40123456-7', phone: '04141234567');
+    expect(sup.rif, 'J-40123456-7');
     state.suppliers.add(sup);
     await state.recordSupplierPurchase(
       supplier: sup,
       invoiceRef: 'F-001',
       paid: true,
       notes: 'Lote nuevo',
-      lines: [PurchaseLine(productId: shirt.id, productName: shirt.name, color: 'Negro', qty: 10, unitCost: 19.00)],
+      lines: [
+        PurchaseLine(
+          productId: shirt.id,
+          productName: shirt.name,
+          sku: 'TOP-CUSTOM-01',
+          color: 'Negro',
+          size: 'XXL',
+          qty: 10,
+          unitCost: 19.00,
+        ),
+      ],
     );
+    expect(shirt.sku, 'TOP-CUSTOM-01');
+    expect(shirt.sizes, contains('XXL'));
     expect(shirt.stockForColor('Negro'), initialNegro + 10);
     expect(shirt.stockForColor('Blanco'), initialBlanco);
 

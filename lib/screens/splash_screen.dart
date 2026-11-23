@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../app_state.dart';
@@ -12,20 +13,15 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   double _progress = 0;
   String _status = 'Iniciando...';
   bool _started = false;
 
   late final AnimationController _intro = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1600),
+    duration: const Duration(milliseconds: 1250),
   )..forward();
-
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2200),
-  )..repeat(reverse: true);
 
   late final Animation<double> _logoScale = Tween<double>(begin: 0.25, end: 1.0).animate(
     CurvedAnimation(parent: _intro, curve: const Interval(0.0, 0.58, curve: Curves.elasticOut)),
@@ -49,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     CurvedAnimation(parent: _intro, curve: const Interval(0.28, 0.72, curve: Curves.easeOut)),
   );
   late final Animation<Offset> _textSlide = Tween<Offset>(
-    begin: const Offset(0, 0.35),
+    begin: const Offset(0, 0.30),
     end: Offset.zero,
   ).animate(CurvedAnimation(parent: _intro, curve: const Interval(0.28, 0.75, curve: Curves.easeOutCubic)));
 
@@ -62,46 +58,59 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     }
   }
 
-  /// Carga la base de datos y precarga miniaturas optimizadas para arrancar rápido y fluido.
+  /// Carga rápida: abre BD local, sincroniza BCV en segundo plano sin bloquear
+  /// y precarga solo el logo y los primeros productos visibles (el resto carga bajo demanda).
   Future<void> _load() async {
     final state = AppScope.read(context);
-    await Future.delayed(const Duration(milliseconds: 300));
+    final startedAt = DateTime.now();
+    await Future.delayed(const Duration(milliseconds: 250));
     if (!mounted) return;
-    setState(() => _status = 'Cargando base de datos...');
+
     await state.load();
     if (!mounted) return;
-    if (state.settings.autoSyncBcv) {
-      setState(() => _status = 'Actualizando tasa BCV...');
-      await state.syncBcvRate();
-      if (!mounted) return;
-    }
-    await precacheImage(const AssetImage('assets/logo.png'), context);
-    if (!mounted) return;
-    setState(() => _status = 'Cargando catálogo...');
+    setState(() {
+      _progress = 0.35;
+      _status = 'Preparando catálogo...';
+    });
 
-    final products = state.activeProducts;
-    final total = products.isEmpty ? 1 : products.length;
+    // Sincroniza tasa BCV en segundo plano para no retrasar el arranque
+    if (state.settings.autoSyncBcv) {
+      unawaited(state.syncBcvRate());
+    }
+
+    try {
+      await precacheImage(const AssetImage('assets/logo.png'), context);
+    } catch (_) {}
+    if (!mounted) return;
+
+    final firstBatch = state.activeProducts.take(8).toList();
+    final total = firstBatch.isEmpty ? 1 : firstBatch.length;
     var done = 0;
-    await Future.wait(products.map((p) async {
-      final provider = ProductImage.provider(p.image, cacheWidth: 480);
+    for (final p in firstBatch) {
+      final provider = ProductImage.provider(p.image, cacheWidth: 320);
       if (provider != null && mounted) {
         try {
-          await precacheImage(provider, context, onError: (_, _) {}).timeout(const Duration(seconds: 4));
-        } catch (_) {/* sin conexión o archivo faltante: se usa el fallback */}
+          await precacheImage(provider, context, onError: (_, _) {}).timeout(const Duration(seconds: 2));
+        } catch (_) {}
       }
       done++;
-      if (mounted && (done % 4 == 0 || done == total)) {
+      if (mounted) {
         setState(() {
-          _progress = done / total;
-          _status = done < total ? 'Cargando productos ($done/$total)...' : '¡Listo!';
+          _progress = 0.35 + (done / total) * 0.65;
+          _status = done < total ? 'Preparando catálogo...' : '¡Listo!';
         });
       }
-    }));
-    await Future.delayed(const Duration(milliseconds: 550));
+    }
+
+    final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
+    if (elapsed < 1150) {
+      await Future.delayed(Duration(milliseconds: 1150 - elapsed));
+    }
     if (!mounted) return;
-    expandMainWindow();
+    await expandMainWindow();
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(PageRouteBuilder(
-      transitionDuration: const Duration(milliseconds: 500),
+      transitionDuration: const Duration(milliseconds: 320),
       pageBuilder: (_, a, _) => FadeTransition(opacity: a, child: const LoginScreen(isEntryGate: true)),
     ));
   }
@@ -109,7 +118,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   void dispose() {
     _intro.dispose();
-    _pulse.dispose();
     super.dispose();
   }
 
@@ -152,103 +160,96 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
           border: Border.all(color: NayColors.primary.withValues(alpha: 0.45)),
         ),
         child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 170,
-                height: 150,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    _expandingRing(_ring1, NayColors.primary, 2.2),
-                    _expandingRing(_ring2, NayColors.accent, 1.4),
-                    AnimatedBuilder(
-                      animation: Listenable.merge([_intro, _pulse]),
-                      builder: (_, child) {
-                        final glow = 0.35 + _pulse.value * 0.4;
-                        final blur = 18.0 + _pulse.value * 16.0;
-                        return FadeTransition(
-                          opacity: _logoOpacity,
-                          child: Transform.scale(
-                            scale: _logoScale.value,
-                            child: Container(
-                              width: 122,
-                              height: 122,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: NayColors.primary, width: 2.2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: NayColors.primary.withValues(alpha: glow),
-                                    blurRadius: blur,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                              child: ClipOval(
-                                child: Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    child!,
-                                    if (_shine.value > 0 && _shine.value < 1)
-                                      Transform.translate(
-                                        offset: Offset(-160 + _shine.value * 320, 0),
-                                        child: Transform.rotate(
-                                          angle: -math.pi / 8,
-                                          child: Container(
-                                            width: 48,
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                colors: [
-                                                  Colors.transparent,
-                                                  Colors.white.withValues(alpha: 0.55),
-                                                  Colors.transparent,
-                                                ],
+          child: RepaintBoundary(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 170,
+                  height: 150,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      _expandingRing(_ring1, NayColors.primary, 2.2),
+                      _expandingRing(_ring2, NayColors.accent, 1.4),
+                      AnimatedBuilder(
+                        animation: _intro,
+                        builder: (_, child) {
+                          return FadeTransition(
+                            opacity: _logoOpacity,
+                            child: Transform.scale(
+                              scale: _logoScale.value,
+                              child: Container(
+                                width: 122,
+                                height: 122,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: NayColors.primary, width: 2.2),
+                                ),
+                                child: ClipOval(
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      child!,
+                                      if (_shine.value > 0 && _shine.value < 1)
+                                        Transform.translate(
+                                          offset: Offset(-160 + _shine.value * 320, 0),
+                                          child: Transform.rotate(
+                                            angle: -math.pi / 8,
+                                            child: Container(
+                                              width: 46,
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [
+                                                    Colors.transparent,
+                                                    Colors.white.withValues(alpha: 0.55),
+                                                    Colors.transparent,
+                                                  ],
+                                                ),
                                               ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      },
-                      child: const NayLogo(size: 118),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              FadeTransition(
-                opacity: _textOpacity,
-                child: SlideTransition(
-                  position: _textSlide,
-                  child: const BrandName(fontSize: 42),
-                ),
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: 220,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: _progress == 0 ? null : _progress,
-                    minHeight: 4,
-                    color: NayColors.primary,
-                    backgroundColor: Colors.white.withValues(alpha: 0.12),
+                          );
+                        },
+                        child: const NayLogo(size: 118),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                _status,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
-              ),
-            ],
+                const SizedBox(height: 4),
+                FadeTransition(
+                  opacity: _textOpacity,
+                  child: SlideTransition(
+                    position: _textSlide,
+                    child: const BrandName(fontSize: 42, animated: false),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: 220,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: _progress == 0 ? null : _progress,
+                      minHeight: 4,
+                      color: NayColors.primary,
+                      backgroundColor: Colors.white.withValues(alpha: 0.12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _status,
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
+                ),
+              ],
+            ),
           ),
         ),
       ),

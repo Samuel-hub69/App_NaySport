@@ -29,7 +29,7 @@ class LocalDb {
   static Future<void> write(Map<String, dynamic> data) async {
     await dir.create(recursive: true);
     final tmp = File('${file.path}.tmp');
-    await tmp.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+    await tmp.writeAsString(jsonEncode(data));
     await tmp.rename(file.path);
   }
 

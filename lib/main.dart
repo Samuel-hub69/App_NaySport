@@ -12,6 +12,7 @@ void main() {
   try {
     final window = WindowManager.instance.getCurrent();
     if (window != null) {
+      window.unmaximize();
       window.setFrameless(true);
       window.isResizable = false;
       window.setSize(kSplashSize.toNative(), false);
@@ -22,17 +23,18 @@ void main() {
   runApp(NaySportApp(state: AppState()));
 }
 
-/// Agranda la ventana cuando terminó de cargar.
-void expandMainWindow() {
+/// Agranda la ventana cuando terminó de cargar (de forma segura en Win32).
+Future<void> expandMainWindow() async {
   try {
     final window = WindowManager.instance.getCurrent();
     if (window == null) return;
     window.setFrameless(false);
-    window.titleBarStyle = TitleBarStyle.normal; // devuelve el marco y la barra de título
+    window.titleBarStyle = TitleBarStyle.normal;
     window.isResizable = true;
     window.minimumSize = const Size(1100, 700).toNative();
-    window.setSize(const Size(1366, 820).toNative(), true);
+    window.setSize(const Size(1366, 820).toNative(), false);
     window.center();
+    await Future.delayed(const Duration(milliseconds: 60));
     window.maximize();
     window.focus();
   } catch (_) {}
