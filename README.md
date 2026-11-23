@@ -17,7 +17,7 @@ Al abrir el programa muestra una pantalla de carga inicial (*splash screen*) y l
 
 ## Qué hace
 
-- **Acceso por roles desde el inicio.** Cada perfil entra directo a lo que le corresponde: **Administrador** (control total), **Cajero** (caja física y ventas del día) o **Cliente / Visitante** (catálogo y compra online).
+- **Acceso por roles desde el inicio.** Cada perfil entra directo a lo que le corresponde: **Administrador** (control total), **Cajero** (caja física y ventas del día), **Almacenista** (stock, Kardex, proveedores y categorías) o **Cliente / Visitante** (catálogo y compra online).
 - **Tienda online con catálogo real.** 59 productos iniciales organizados en 6 categorías (*Casual, Deportiva, Calzado, Prendas, Perfumes y Accesorios*), buscador en tiempo real, precios en dólares (`$`) y bolívares (`Bs`), selección de color/talla con combinación de variantes, descuentos automáticos por cantidad y carrito de compras.
 - **Proceso de compra online en 3 pasos.** Dirección de envío con validación por país y código postal, métodos de pago online (*PayPal, Tarjeta con validación Luhn, Pago Móvil, Zelle, Google Pay y Apple Pay*) y confirmación con descuento automático del stock por color.
 - **Caja / Ventas para tienda física.** Pensada para cobrar en mostrador: búsqueda rápida por prenda o categoría, selección de color/talla/cantidad, registro de datos del cliente (*nombre completo, cédula, teléfono y dirección*), descuentos automáticos por cantidad, métodos de pago físicos (*Punto de Venta, Pago Móvil, Zelle, Efectivo `$` y Efectivo `Bs`*) y comprobante imprimible en PDF.
@@ -51,6 +51,11 @@ Si solo quieres instalar y usar **NaySport** en Windows (sin compilar nada):
 1. Descarga **[`NaySport_Setup.exe`](https://github.com/Samuel-hub69/App_NaySport/releases/download/v1.0.0/NaySport_Setup.exe)** (también disponible en la raíz del repositorio y en [Releases](https://github.com/Samuel-hub69/App_NaySport/releases/tag/v1.0.0)).
 2. Haz doble clic en `NaySport_Setup.exe` y sigue el asistente (**Siguiente → Instalar → Finalizar**).
 3. La aplicación quedará instalada con su ícono en el Escritorio y en el Menú Inicio de Windows.
+
+> **Nota sobre avisos de Windows (SmartScreen / Control Inteligente de Aplicaciones):**
+> Al ser un proyecto independiente sin certificado comercial de firma de código (*Code Signing*), Windows puede mostrar una advertencia de publicador desconocido al ejecutar `NaySport_Setup.exe`:
+> - **En Windows 10 / 11 (SmartScreen):** si aparece *"Windows protegió su PC"*, haz clic en **Más información → Ejecutar de todas formas**.
+> - **En Windows 11 con *Control Inteligente de Aplicaciones* activado:** Windows bloquea automáticamente cualquier `.exe` descargado sin firma comercial. En ese caso, la forma recomendada es ejecutar la app desde el código fuente con Flutter (ver sección **Cómo ejecutarlo** más abajo).
 
 ## Requisitos (solo para compilar desde código)
 

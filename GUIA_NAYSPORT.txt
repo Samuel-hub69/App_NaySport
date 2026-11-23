@@ -7,12 +7,24 @@
 - Si estás en tu PC: abre el acceso directo "NaySport" en C:\NaySport.
 - Si te pasaron la carpeta comprimida (.zip): descomprime TODA la carpeta y haz
   doble clic en "naysport.exe". (No saques el .exe solo de la carpeta).
-- Si descargaste el proyecto desde GitHub (en Windows con Flutter actualizado y
-  Visual Studio con "Desarrollo para el escritorio con C++"):
-  1) Abre PowerShell o CMD dentro de la carpeta del proyecto.
-  2) Ejecuta:
+- Si descargaste el instalador "NaySport_Setup.exe" desde GitHub Releases:
+  1) Haz doble clic en "NaySport_Setup.exe" y sigue el asistente
+     (Siguiente -> Instalar -> Finalizar).
+  2) NOTA DE WINDOWS: al ser un instalador independiente sin certificado
+     comercial pago (Code Signing), Windows puede mostrar un aviso de
+     publicador desconocido:
+     * Si sale SmartScreen ("Windows protegió su PC"): haz clic en
+       "Más información" -> "Ejecutar de todas formas".
+     * Si tu PC tiene Windows 11 con "Control Inteligente de Aplicaciones"
+       activado, Windows bloquea cualquier .exe sin firma comercial; en ese
+       caso usa el método de Flutter (abajo) para compilarla en tu propia PC.
+- Si descargaste o clonaste el proyecto desde GitHub (en Windows con Flutter
+  actualizado y Visual Studio con "Desarrollo para el escritorio con C++"):
+  1) Abre PowerShell y ejecuta:
+     git clone https://github.com/Samuel-hub69/App_NaySport.git
+     cd App_NaySport
      flutter pub get
-  3) Luego elige una de estas dos formas:
+  2) Luego elige una de estas dos formas:
      * Para abrir la app directo por comando:
        flutter run -d windows
      * Para generar el ejecutable (.exe):
