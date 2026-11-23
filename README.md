@@ -44,7 +44,15 @@ La aplicación ya viene precargada con 59 artículos reales listos para probar s
   </tr>
 </table>
 
-## Requisitos
+## Descargar e instalar (Windows)
+
+Si solo quieres instalar y usar **NaySport** en Windows (sin compilar nada):
+
+1. Descarga **[`NaySport_Setup.exe`](https://github.com/Samuel-hub69/App_NaySport/releases/download/v1.0.0/NaySport_Setup.exe)** (también disponible en la raíz del repositorio y en [Releases](https://github.com/Samuel-hub69/App_NaySport/releases/tag/v1.0.0)).
+2. Haz doble clic en `NaySport_Setup.exe` y sigue el asistente (**Siguiente → Instalar → Finalizar**).
+3. La aplicación quedará instalada con su ícono en el Escritorio y en el Menú Inicio de Windows.
+
+## Requisitos (solo para compilar desde código)
 
 - **Windows** (proyecto configurado para escritorio Windows).
 - **Flutter** actualizado (`>= 3.50.0` / Dart `>= 3.14.0`).
