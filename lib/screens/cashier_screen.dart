@@ -126,7 +126,7 @@ class _CashierPosViewState extends State<CashierPosView> {
   }
 
   Future<void> _openPicker(Product p) async {
-    final res = await showDialog<List<({String? color, String? size, int qty})>>(
+    final res = await showAnimatedDialog<List<({String? color, String? size, int qty})>>(
       context: context,
       builder: (_) => _PosProductPicker(
         product: p,
@@ -252,7 +252,7 @@ class _CashierPosViewState extends State<CashierPosView> {
       Expanded(
         child: Column(children: [
           Container(
-            color: Colors.white,
+            color: NayColors.surface,
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
@@ -268,7 +268,7 @@ class _CashierPosViewState extends State<CashierPosView> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text('${filtered.length} disponibles', style: TextStyle(color: Colors.grey.shade600)),
+                Text('${filtered.length} disponibles', style: const TextStyle(color: NayColors.textMuted)),
               ]),
               const SizedBox(height: 10),
               SingleChildScrollView(
@@ -308,46 +308,59 @@ class _CashierPosViewState extends State<CashierPosView> {
                     itemBuilder: (_, i) {
                       final p = filtered[i];
                       final avail = _availableInSale(p);
-                      return Card(
-                        elevation: 0,
-                        color: Colors.white,
-                        clipBehavior: Clip.antiAlias,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        child: InkWell(
-                          onTap: avail <= 0 ? null : () => _openPicker(p),
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Expanded(
-                              child: Stack(fit: StackFit.expand, children: [
-                                ProductImage(p.image, fallbackIcon: state.categoryIcon(p.categoryId)),
-                                Positioned(
-                                  top: 6,
-                                  right: 6,
-                                  child: Chip(
-                                    visualDensity: VisualDensity.compact,
-                                    backgroundColor: avail <= 0
-                                        ? Colors.red.shade100
-                                        : (avail <= 5 ? Colors.orange.shade100 : Colors.white.withValues(alpha: 0.92)),
-                                    label: Text(avail <= 0 ? 'Agotado' : 'Stock: $avail',
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      return RepaintBoundary(
+                        child: Card(
+                          elevation: 0,
+                          color: NayColors.surface,
+                          clipBehavior: Clip.antiAlias,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: const BorderSide(color: NayColors.border),
+                          ),
+                          child: InkWell(
+                            onTap: avail <= 0 ? null : () => _openPicker(p),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Expanded(
+                                child: Stack(fit: StackFit.expand, children: [
+                                  ProductImage(
+                                    p.image,
+                                    cacheWidth: 360,
+                                    fallbackIcon: state.categoryIcon(p.categoryId),
                                   ),
-                                ),
-                              ]),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(p.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                                const SizedBox(height: 4),
-                                Row(children: [
-                                  Expanded(child: PriceText(p.price, fontSize: 14.5)),
-                                  Icon(Icons.add_circle, color: avail > 0 ? NayColors.primary : Colors.grey, size: 26),
+                                  Positioned(
+                                    top: 6,
+                                    right: 6,
+                                    child: Chip(
+                                      visualDensity: VisualDensity.compact,
+                                      backgroundColor: avail <= 0
+                                          ? Colors.red.shade900.withValues(alpha: 0.92)
+                                          : (avail <= 5
+                                              ? Colors.orange.shade900.withValues(alpha: 0.92)
+                                              : Colors.black.withValues(alpha: 0.72)),
+                                      label: Text(avail <= 0 ? 'Agotado' : 'Stock: $avail',
+                                          style: const TextStyle(
+                                              fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                                    ),
+                                  ),
                                 ]),
-                              ]),
-                            ),
-                          ]),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(10),
+                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Text(p.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold, fontSize: 13.5, color: Colors.white)),
+                                  const SizedBox(height: 4),
+                                  Row(children: [
+                                    Expanded(child: PriceText(p.price, fontSize: 14.5)),
+                                    Icon(Icons.add_circle, color: avail > 0 ? NayColors.primary : Colors.grey, size: 26),
+                                  ]),
+                                ]),
+                              ),
+                            ]),
+                          ),
                         ),
                       );
                     },
@@ -358,9 +371,9 @@ class _CashierPosViewState extends State<CashierPosView> {
       // Derecha: ticket de venta actual + cliente + métodos de pago físicos
       Container(
         width: 440,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(left: BorderSide(color: Colors.grey.shade200)),
+        decoration: const BoxDecoration(
+          color: NayColors.surface,
+          border: Border(left: BorderSide(color: NayColors.border)),
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(18),
@@ -515,9 +528,9 @@ class _CashierPosViewState extends State<CashierPosView> {
                     width: 196,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: _method == m ? m.color.withValues(alpha: 0.1) : Colors.white,
+                      color: _method == m ? m.color.withValues(alpha: 0.2) : NayColors.surfaceElevated,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _method == m ? m.color : Colors.grey.shade300, width: _method == m ? 2 : 1),
+                      border: Border.all(color: _method == m ? m.color : NayColors.border, width: _method == m ? 2 : 1),
                     ),
                     child: Row(children: [
                       Icon(m.icon, color: m.color, size: 20),
@@ -781,7 +794,7 @@ class _CashierTodayView extends StatelessWidget {
         const SizedBox(height: 20),
         Card(
           elevation: 0,
-          color: Colors.white,
+          color: NayColors.surface,
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -807,14 +820,14 @@ class _CashierTodayView extends StatelessWidget {
       if (myToday.isEmpty)
         const Card(
           elevation: 0,
-          color: Colors.white,
+          color: NayColors.surface,
           child: Padding(padding: EdgeInsets.all(28), child: Center(child: Text('Aún no registras ventas hoy.'))),
         )
       else
         for (final o in myToday) ...[
           Card(
             elevation: 0,
-            color: Colors.white,
+            color: NayColors.surface,
             child: ExpansionTile(
               title: Text('${o.id} — ${o.customerName}', style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text('${fmtDate(o.date)} • ${o.paymentMethod} • ${o.units} unid.'),
@@ -833,7 +846,7 @@ class _CashierTodayView extends StatelessWidget {
                           if (o.customerPhone.isNotEmpty) 'Tel: ${o.customerPhone}',
                           if (o.address.isNotEmpty && o.address != 'Retiro en tienda') 'Dir: ${o.address}',
                         ].join(' • '),
-                        style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                        style: const TextStyle(fontSize: 12.5, color: NayColors.textMuted),
                       ),
                     ),
                   ),
@@ -864,15 +877,15 @@ class _CashierStatCard extends StatelessWidget {
       width: 260,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: NayColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: NayColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: TextStyle(color: Colors.grey.shade700)),
+        Text(title, style: const TextStyle(color: NayColors.textMuted)),
         const SizedBox(height: 8),
         Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
-        Text(sub, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+        Text(sub, style: const TextStyle(color: NayColors.textMuted, fontSize: 13)),
       ]),
     );
   }

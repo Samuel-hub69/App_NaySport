@@ -215,10 +215,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     constraints: const BoxConstraints(maxWidth: 680),
                     child: Card(
                       elevation: 0,
-                      color: Colors.white,
+                      color: NayColors.surface,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
-                        side: BorderSide(color: Colors.pink.shade100),
+                        side: const BorderSide(color: NayColors.border),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(28),
@@ -638,11 +638,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: NayColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.pink.shade100),
+        border: Border.all(color: NayColors.border),
         boxShadow: [
-          BoxShadow(color: Colors.pink.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 6)),
+          BoxShadow(color: NayColors.primary.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 6)),
         ],
       ),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -720,7 +720,7 @@ class _HorizontalStepperBar extends StatelessWidget {
   Widget build(BuildContext context) {
     const labels = ['Dirección de envío', 'Método de pago', 'Confirmar'];
     return Container(
-      color: Colors.white,
+      color: NayColors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
       child: Center(
         child: ConstrainedBox(
@@ -735,12 +735,12 @@ class _HorizontalStepperBar extends StatelessWidget {
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     CircleAvatar(
                       radius: 15,
-                      backgroundColor: i <= currentStep ? NayColors.primary : Colors.grey.shade300,
+                      backgroundColor: i <= currentStep ? NayColors.primary : NayColors.surfaceElevated,
                       child: i < currentStep
                           ? const Icon(Icons.check, size: 17, color: Colors.white)
                           : Text('${i + 1}',
                               style: TextStyle(
-                                color: i == currentStep ? Colors.white : Colors.black54,
+                                color: i == currentStep ? Colors.white : NayColors.textMuted,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
                               )),
@@ -750,7 +750,7 @@ class _HorizontalStepperBar extends StatelessWidget {
                       labels[i],
                       style: TextStyle(
                         fontWeight: i == currentStep ? FontWeight.bold : FontWeight.w500,
-                        color: i <= currentStep ? NayColors.dark : Colors.grey,
+                        color: i <= currentStep ? Colors.white : NayColors.textMuted,
                       ),
                     ),
                   ]),
@@ -761,7 +761,7 @@ class _HorizontalStepperBar extends StatelessWidget {
                   child: Container(
                     height: 2,
                     margin: const EdgeInsets.symmetric(horizontal: 12),
-                    color: i < currentStep ? NayColors.primary : Colors.grey.shade300,
+                    color: i < currentStep ? NayColors.primary : NayColors.border,
                   ),
                 ),
             ],
@@ -807,7 +807,7 @@ class _ConfirmBlock extends StatelessWidget {
         for (final line in lines)
           Padding(
             padding: const EdgeInsets.only(top: 2),
-            child: Text(line, style: TextStyle(color: Colors.grey.shade800)),
+            child: Text(line, style: const TextStyle(color: NayColors.textMuted)),
           ),
       ]),
     );
@@ -830,15 +830,15 @@ class _MethodTile extends StatelessWidget {
         width: 295,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: selected ? method.color.withValues(alpha: 0.08) : Colors.white,
+          color: selected ? method.color.withValues(alpha: 0.2) : NayColors.surfaceElevated,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? method.color : Colors.grey.shade300, width: selected ? 2 : 1),
+          border: Border.all(color: selected ? method.color : NayColors.border, width: selected ? 2 : 1),
         ),
         child: Row(children: [
           CircleAvatar(
             radius: 19,
-            backgroundColor: method.color.withValues(alpha: 0.12),
-            child: Icon(method.icon, color: method.color, size: 22),
+            backgroundColor: method.color.withValues(alpha: 0.22),
+            child: Icon(method.icon, color: method.color == Colors.black ? Colors.white : method.color, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -847,10 +847,10 @@ class _MethodTile extends StatelessWidget {
               Text(method.subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
+                  style: const TextStyle(fontSize: 11.5, color: NayColors.textMuted)),
             ]),
           ),
-          if (selected) Icon(Icons.check_circle, color: method.color, size: 20),
+          if (selected) Icon(Icons.check_circle, color: method.color == Colors.black ? NayColors.accent : method.color, size: 20),
         ]),
       ),
     );

@@ -124,15 +124,71 @@ class AppState extends ChangeNotifier {
     await save();
   }
 
-  // ---------------------------------------------------------------- catálogo / colores
+  // ---------------------------------------------------------------- catálogo / colores / tallas
   List<Product> get activeProducts => products.where((p) => p.active).toList();
-  List<String> get allColorNames => {...kColorPalette.keys, ...settings.customColors.keys}.toList();
+  List<String> get allColorNames {
+    final removed = settings.removedColors.toSet();
+    return {...kColorPalette.keys, ...settings.customColors.keys}
+        .where((c) => !removed.contains(c))
+        .toList();
+  }
+
   int colorHexFor(String name) => settings.customColors[name] ?? kColorPalette[name] ?? 0xFFCCCCCC;
 
   Future<void> addCustomColor(String name, int colorValue) async {
     final clean = name.trim();
     if (clean.isEmpty) return;
+    settings.removedColors.remove(clean);
     settings.customColors[clean] = colorValue;
+    await commit();
+  }
+
+  Future<void> removeColor(String name) async {
+    final clean = name.trim();
+    if (clean.isEmpty) return;
+    settings.customColors.remove(clean);
+    if (kColorPalette.containsKey(clean) && !settings.removedColors.contains(clean)) {
+      settings.removedColors.add(clean);
+    }
+    await commit();
+  }
+
+  static String sizeGroupForCategory(String categoryId) =>
+      categoryId == 'calzado' ? 'calzado' : 'ropa';
+
+  static List<String> defaultSizesForGroup(String group) => group == 'calzado'
+      ? const ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45']
+      : const ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Única'];
+
+  List<String> availableSizesForCategory(String categoryId) {
+    final group = sizeGroupForCategory(categoryId);
+    final removed = (settings.removedSizes[group] ?? const []).toSet();
+    final base = defaultSizesForGroup(group);
+    final extra = settings.customSizes[group] ?? const [];
+    return {...base, ...extra}.where((s) => !removed.contains(s)).toList();
+  }
+
+  Future<void> addCustomSize(String categoryId, String size) async {
+    final clean = size.trim();
+    if (clean.isEmpty) return;
+    final group = sizeGroupForCategory(categoryId);
+    settings.removedSizes[group]?.remove(clean);
+    final list = settings.customSizes.putIfAbsent(group, () => []);
+    if (!list.contains(clean) && !defaultSizesForGroup(group).contains(clean)) {
+      list.add(clean);
+    }
+    await commit();
+  }
+
+  Future<void> removeSize(String categoryId, String size) async {
+    final clean = size.trim();
+    if (clean.isEmpty) return;
+    final group = sizeGroupForCategory(categoryId);
+    settings.customSizes[group]?.remove(clean);
+    if (defaultSizesForGroup(group).contains(clean)) {
+      final rem = settings.removedSizes.putIfAbsent(group, () => []);
+      if (!rem.contains(clean)) rem.add(clean);
+    }
     await commit();
   }
 

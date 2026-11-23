@@ -37,7 +37,7 @@ class CartScreen extends StatelessWidget {
                       final pct = state.discountPercentFor(item);
                       return Card(
                         elevation: 0,
-                        color: Colors.white,
+                        color: NayColors.surface,
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Row(children: [
@@ -47,6 +47,7 @@ class CartScreen extends StatelessWidget {
                                 width: 90,
                                 height: 100,
                                 child: ProductImage(item.product.image,
+                                    cacheWidth: 220,
                                     fallbackIcon: state.categoryIcon(item.product.categoryId)),
                               ),
                             ),
@@ -66,10 +67,10 @@ class CartScreen extends StatelessWidget {
                                   if (item.size != null) Text('Talla: ${item.size}'),
                                 ]),
                                 Text('${usd(item.product.price)} c/u',
-                                    style: TextStyle(color: Colors.grey.shade600)),
+                                    style: const TextStyle(color: NayColors.textMuted)),
                                 if (pct > 0)
                                   Text('Descuento por cantidad: -${pct.toStringAsFixed(0)}%',
-                                      style: TextStyle(color: Colors.green.shade700, fontSize: 12)),
+                                      style: TextStyle(color: Colors.greenAccent.shade200, fontSize: 12)),
                               ]),
                             ),
                             IconButton(
@@ -108,20 +109,24 @@ class CartScreen extends StatelessWidget {
                   width: 360,
                   margin: const EdgeInsets.all(24),
                   padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                  decoration: BoxDecoration(
+                    color: NayColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: NayColors.border),
+                  ),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     const Text('Resumen del pedido', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 20),
                     _row('Subtotal', usd(state.subtotal)),
                     if (state.discountTotal > 0)
-                      _row('Descuentos', '-${usd(state.discountTotal)}', color: Colors.green.shade700),
+                      _row('Descuentos', '-${usd(state.discountTotal)}', color: Colors.greenAccent.shade200),
                     _row('Envío', state.shipping == 0 ? 'GRATIS' : usd(state.shipping),
-                        color: state.shipping == 0 ? Colors.green : null),
+                        color: state.shipping == 0 ? Colors.greenAccent.shade200 : null),
                     const Divider(height: 32),
                     _row('Total', usd(state.total), bold: true, color: NayColors.primary),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: Text(bs(state.total, rate), style: TextStyle(color: Colors.grey.shade600)),
+                      child: Text(bs(state.total, rate), style: const TextStyle(color: NayColors.textMuted)),
                     ),
                     const SizedBox(height: 24),
                     SizedBox(

@@ -94,6 +94,17 @@ void main() {
 
     await state.addCustomColor('Turquesa', 0xFF009688);
     expect(state.allColorNames, contains('Turquesa'));
+    await state.removeColor('Turquesa');
+    expect(state.allColorNames, isNot(contains('Turquesa')));
+    await state.addCustomColor('Turquesa', 0xFF009688);
+    expect(state.allColorNames, contains('Turquesa'));
+
+    await state.addCustomSize('calzado', '46');
+    expect(state.availableSizesForCategory('calzado'), contains('46'));
+    await state.removeSize('calzado', '46');
+    expect(state.availableSizesForCategory('calzado'), isNot(contains('46')));
+    await state.removeSize('calzado', '34');
+    expect(state.availableSizesForCategory('calzado'), isNot(contains('34')));
 
     final sup = Supplier(id: 'sup1', name: 'Textiles Caracas', phone: '04141234567');
     state.suppliers.add(sup);

@@ -48,19 +48,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(
                   width: 360,
                   child: TextField(
+                    style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: 'Buscar productos...',
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: NayColors.surfaceElevated,
                       prefixIcon: const Icon(Icons.search, color: NayColors.primary),
                       isDense: true,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
+                        borderSide: const BorderSide(color: NayColors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: const BorderSide(color: NayColors.border),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
-                        borderSide: const BorderSide(color: NayColors.primary, width: 2),
+                        borderSide: const BorderSide(color: NayColors.primary, width: 1.8),
                       ),
                     ),
                     onChanged: (v) => setState(() => _query = v),
@@ -132,40 +137,80 @@ class _HomeScreenState extends State<HomeScreen> {
             onSelect: (c) => setState(() => _selected = c),
           ),
           Expanded(
-            child: CustomScrollView(
-              slivers: [
-                if (_selected == null && _query.isEmpty) const SliverToBoxAdapter(child: _HeroBanner()),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                  sliver: SliverToBoxAdapter(
-                    child: Text(
-                      _selected == null ? 'Todos los productos' : state.categoryName(_selected!),
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 240),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SlideTransition(
+                  position: Tween<Offset>(begin: const Offset(0, 0.025), end: Offset.zero).animate(anim),
+                  child: child,
                 ),
-                if (filtered.isEmpty)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(child: Text('No hay productos en esta categoría')),
-                  )
-                else
+              ),
+              child: CustomScrollView(
+                key: ValueKey('cat_${_selected ?? 'all'}'),
+                slivers: [
+                  if (_selected == null && _query.isEmpty) const SliverToBoxAdapter(child: _HeroBanner()),
                   SliverPadding(
-                    padding: const EdgeInsets.all(24),
-                    sliver: SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 280,
-                        mainAxisSpacing: 20,
-                        crossAxisSpacing: 20,
-                        childAspectRatio: 0.62,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (_, i) => ProductCard(product: filtered[i]),
-                        childCount: filtered.length,
-                      ),
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                    sliver: SliverToBoxAdapter(
+                      child: Row(children: [
+                        if (_selected != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: NayColors.primary.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: NayColors.primary.withValues(alpha: 0.45)),
+                            ),
+                            child: Icon(state.categoryIcon(_selected!), color: NayColors.primary, size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
+                        Text(
+                          _selected == null ? 'Todos los productos' : state.categoryName(_selected!),
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: NayColors.surfaceElevated,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: NayColors.border),
+                          ),
+                          child: Text(
+                            '${filtered.length} ${filtered.length == 1 ? 'artículo' : 'artículos'}',
+                            style: const TextStyle(fontSize: 12, color: NayColors.textMuted),
+                          ),
+                        ),
+                      ]),
                     ),
                   ),
-              ],
+                  if (filtered.isEmpty)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(child: Text('No hay productos en esta categoría')),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.all(24),
+                      sliver: SliverGrid(
+                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 280,
+                          mainAxisSpacing: 20,
+                          crossAxisSpacing: 20,
+                          childAspectRatio: 0.62,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (_, i) => ProductCard(product: filtered[i]),
+                          childCount: filtered.length,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ],
@@ -391,80 +436,123 @@ class _HeroBanner extends StatelessWidget {
   }
 }
 
-class ProductCard extends StatelessWidget {
+class ProductCard extends StatefulWidget {
   final Product product;
   const ProductCard({super.key, required this.product});
 
   @override
+  State<ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<ProductCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
+    final product = widget.product;
     final soldOut = product.stock <= 0;
-    void open() => showDialog(context: context, builder: (_) => ProductDialog(product: product));
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: open,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Stack(fit: StackFit.expand, children: [
-                ProductImage(product.image, fallbackIcon: state.categoryIcon(product.categoryId)),
-                if (soldOut)
-                  Container(
-                    color: Colors.white60,
-                    alignment: Alignment.center,
-                    child: const Chip(label: Text('AGOTADO'), backgroundColor: Colors.black87,
-                        labelStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  )
-                else if (product.stock <= 5)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Chip(
-                      visualDensity: VisualDensity.compact,
-                      backgroundColor: Colors.orange.shade100,
-                      label: Text('¡Quedan ${product.stock}!', style: const TextStyle(fontSize: 11)),
-                    ),
-                  ),
-              ]),
+    void open() => showAnimatedDialog(context: context, builder: (_) => ProductDialog(product: product));
+    return RepaintBoundary(
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          transform: Matrix4.translationValues(0, _hovered ? -4 : 0, 0),
+          decoration: BoxDecoration(
+            color: NayColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _hovered ? NayColors.primary.withValues(alpha: 0.7) : NayColors.border,
+              width: _hovered ? 1.4 : 1,
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
+            boxShadow: _hovered
+                ? [BoxShadow(color: NayColors.primary.withValues(alpha: 0.22), blurRadius: 18, offset: const Offset(0, 6))]
+                : null,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: open,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(state.categoryName(product.categoryId).toUpperCase(),
-                      style: const TextStyle(fontSize: 11, color: NayColors.primary, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text(product.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                  if (product.colors.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Row(children: [
-                      for (final c in product.colors.take(5))
-                        Padding(padding: const EdgeInsets.only(right: 4), child: ColorDot(c, size: 14)),
-                      if (product.colors.length > 5) Text('+${product.colors.length - 5}', style: const TextStyle(fontSize: 11)),
+                  Expanded(
+                    child: Stack(fit: StackFit.expand, children: [
+                      ProductImage(
+                        product.image,
+                        fallbackIcon: state.categoryIcon(product.categoryId),
+                        cacheWidth: 420,
+                      ),
+                      if (soldOut)
+                        Container(
+                          color: Colors.black54,
+                          alignment: Alignment.center,
+                          child: const Chip(
+                            label: Text('AGOTADO'),
+                            backgroundColor: Colors.black87,
+                            labelStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        )
+                      else if (product.stock <= 5)
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: Chip(
+                            visualDensity: VisualDensity.compact,
+                            backgroundColor: Colors.orange.shade900.withValues(alpha: 0.9),
+                            side: BorderSide(color: Colors.orange.shade300),
+                            label: Text('¡Quedan ${product.stock}!',
+                                style: const TextStyle(fontSize: 11, color: Colors.white)),
+                          ),
+                        ),
                     ]),
-                  ],
-                  const SizedBox(height: 6),
-                  Row(children: [
-                    Expanded(child: PriceText(product.price, fontSize: 16)),
-                    IconButton.filledTonal(
-                      tooltip: 'Agregar al carrito',
-                      icon: const Icon(Icons.add_shopping_cart, size: 20),
-                      onPressed: soldOut ? null : open,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(state.categoryName(product.categoryId).toUpperCase(),
+                            style: const TextStyle(fontSize: 11, color: NayColors.primary, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text(product.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Colors.white)),
+                        if (product.colors.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Row(children: [
+                            for (final c in product.colors.take(5))
+                              Padding(padding: const EdgeInsets.only(right: 4), child: ColorDot(c, size: 14)),
+                            if (product.colors.length > 5)
+                              Text('+${product.colors.length - 5}',
+                                  style: const TextStyle(fontSize: 11, color: NayColors.textMuted)),
+                          ]),
+                        ],
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          Expanded(child: PriceText(product.price, fontSize: 16)),
+                          IconButton.filledTonal(
+                            style: IconButton.styleFrom(
+                              backgroundColor: NayColors.primary.withValues(alpha: 0.2),
+                              foregroundColor: NayColors.accent,
+                            ),
+                            tooltip: 'Agregar al carrito',
+                            icon: const Icon(Icons.add_shopping_cart, size: 20),
+                            onPressed: soldOut ? null : open,
+                          ),
+                        ]),
+                      ],
                     ),
-                  ]),
+                  ),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -576,7 +664,7 @@ class _ProductDialogState extends State<ProductDialog> {
                   const SizedBox(height: 8),
                   PriceText(p.price, fontSize: 24, color: NayColors.primary),
                   const SizedBox(height: 12),
-                  Text(p.description, style: TextStyle(color: Colors.grey.shade700)),
+                  Text(p.description, style: const TextStyle(color: NayColors.textMuted)),
                   const SizedBox(height: 6),
                   Text(
                     (p.colors.isNotEmpty && _color != null)

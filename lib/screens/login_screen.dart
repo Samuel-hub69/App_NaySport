@@ -46,32 +46,52 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: NayColors.bg,
       body: Row(children: [
         Expanded(
           child: Stack(fit: StackFit.expand, children: [
             Container(
               decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [NayColors.dark, NayColors.primary, NayColors.accent],
+                gradient: RadialGradient(
+                  center: Alignment(-0.2, -0.15),
+                  radius: 1.15,
+                  colors: [Color(0xFF421B30), Color(0xFF24101B), Color(0xFF140910)],
                 ),
               ),
             ),
-            const ProductImage('https://loremflickr.com/900/1200/fashion,model?lock=7'),
-            Container(color: NayColors.dark.withValues(alpha: 0.45)),
-            const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  NayLogo(size: 110),
-                  SizedBox(height: 12),
-                  BrandName(fontSize: 48, color: Colors.white),
-                  SizedBox(height: 12),
-                  Text('Viste tu estilo.\nModa casual y deportiva.',
+            Center(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 650),
+                curve: Curves.easeOutCubic,
+                builder: (_, v, child) => Opacity(
+                  opacity: v,
+                  child: Transform.translate(offset: Offset(0, 18 * (1 - v)), child: child),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: NayColors.primary.withValues(alpha: 0.7), width: 2),
+                        boxShadow: [
+                          BoxShadow(color: NayColors.primary.withValues(alpha: 0.35), blurRadius: 28),
+                        ],
+                      ),
+                      child: const NayLogo(size: 108),
+                    ),
+                    const SizedBox(height: 12),
+                    const BrandName(fontSize: 50),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Viste tu estilo.\nModa casual y deportiva.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700)),
-                ],
+                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700, height: 1.35),
+                    ),
+                  ],
+                ),
               ),
             ),
             if (!widget.isEntryGate)
@@ -84,55 +104,89 @@ class _LoginScreenState extends State<LoginScreen> {
           ]),
         ),
         Expanded(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  const Center(child: NayLogo(size: 80)),
-                  const SizedBox(height: 20),
-                  Text(_registerMode ? 'Crear cuenta' : 'Iniciar sesión',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 6),
-                  Text(
-                    _registerMode
-                        ? 'Completa tus datos para comprar en línea'
-                        : 'Ingresa como Cliente, Cajero o Administrador',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(height: 24),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    child: _registerMode
-                        ? _RegisterForm(key: const ValueKey('r'), onSuccess: _success)
-                        : _LoginForm(key: const ValueKey('l'), onSuccess: _success),
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => setState(() => _registerMode = !_registerMode),
-                    child: Text(_registerMode
-                        ? '¿Ya tienes cuenta? Inicia sesión'
-                        : '¿Eres cliente nuevo? Regístrate aquí'),
-                  ),
-                  if (widget.isEntryGate) ...[
-                    const SizedBox(height: 10),
-                    const Row(children: [
-                      Expanded(child: Divider()),
-                      Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('o')),
-                      Expanded(child: Divider()),
-                    ]),
-                    const SizedBox(height: 14),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                      icon: const Icon(Icons.storefront_outlined),
-                      label: const Text('Ver tienda sin cuenta (Visitante)'),
-                      onPressed: _enterAsGuest,
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0.0, -0.08),
+                radius: 0.9,
+                colors: [Color(0xFF1F101A), Color(0xFF110A0E), Color(0xFF0C070A)],
+              ),
+            ),
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(32),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(color: NayColors.primary.withValues(alpha: 0.3), blurRadius: 22),
+                          ],
+                        ),
+                        child: const NayLogo(size: 74),
+                      ),
                     ),
-                  ],
-                ]),
+                    const SizedBox(height: 18),
+                    Text(_registerMode ? 'Crear cuenta' : 'Iniciar sesión',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const SizedBox(height: 6),
+                    Text(
+                      _registerMode
+                          ? 'Completa tus datos para comprar en línea'
+                          : 'Ingresa como Cliente, Cajero o Administrador',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: NayColors.textMuted),
+                    ),
+                    const SizedBox(height: 24),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 280),
+                      switchInCurve: Curves.easeOutCubic,
+                      transitionBuilder: (child, anim) => FadeTransition(
+                        opacity: anim,
+                        child: SlideTransition(
+                          position: Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(anim),
+                          child: child,
+                        ),
+                      ),
+                      child: _registerMode
+                          ? _RegisterForm(key: const ValueKey('r'), onSuccess: _success)
+                          : _LoginForm(key: const ValueKey('l'), onSuccess: _success),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => setState(() => _registerMode = !_registerMode),
+                      child: Text(_registerMode
+                          ? '¿Ya tienes cuenta? Inicia sesión'
+                          : '¿Eres cliente nuevo? Regístrate aquí'),
+                    ),
+                    if (widget.isEntryGate) ...[
+                      const SizedBox(height: 10),
+                      const Row(children: [
+                        Expanded(child: Divider()),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Text('o', style: TextStyle(color: NayColors.textMuted)),
+                        ),
+                        Expanded(child: Divider()),
+                      ]),
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                        ),
+                        icon: const Icon(Icons.storefront_outlined),
+                        label: const Text('Ver tienda sin cuenta (Visitante)'),
+                        onPressed: _enterAsGuest,
+                      ),
+                    ],
+                  ]),
+                ),
               ),
             ),
           ),

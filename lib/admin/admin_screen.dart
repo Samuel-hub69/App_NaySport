@@ -64,7 +64,7 @@ class _AdminScreenState extends State<AdminScreen> {
       body: Row(children: [
         NavigationRail(
           extended: true,
-          backgroundColor: Colors.white,
+          backgroundColor: const Color(0xFF140D12),
           selectedIndex: _tab,
           onDestinationSelected: (i) => setState(() => _tab = i),
           destinations: const [
@@ -178,7 +178,7 @@ class _DashboardTab extends StatelessWidget {
       const SizedBox(height: 24),
       Card(
         elevation: 0,
-        color: Colors.white,
+        color: NayColors.surface,
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -214,7 +214,7 @@ class _DashboardTab extends StatelessWidget {
               Text('Ganancia hoy: ${usd(todayProfit)} (${bs(todayProfit, rate)})',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.teal.shade700)),
               Text('Tienda física: ${usd(todayPhysical)}  |  Online: ${usd(todayOnline)}',
-                  style: TextStyle(color: Colors.grey.shade700)),
+                  style: TextStyle(color: NayColors.textMuted)),
             ]),
             if (todayByMethod.isNotEmpty) ...[
               const SizedBox(height: 14),
@@ -249,7 +249,7 @@ class _DashboardTab extends StatelessWidget {
         Expanded(
           child: Card(
             elevation: 0,
-            color: Colors.white,
+            color: NayColors.surface,
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -300,7 +300,7 @@ class _DashboardTab extends StatelessWidget {
         Expanded(
           child: Card(
             elevation: 0,
-            color: Colors.white,
+            color: NayColors.surface,
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -354,9 +354,9 @@ class _KpiCard extends StatelessWidget {
       width: 225,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: NayColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: NayColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -366,12 +366,12 @@ class _KpiCard extends StatelessWidget {
             child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(width: 10),
-          Expanded(child: Text(title, style: TextStyle(color: Colors.grey.shade700, fontSize: 13))),
+          Expanded(child: Text(title, style: TextStyle(color: NayColors.textMuted, fontSize: 13))),
         ]),
         const SizedBox(height: 12),
         Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 2),
-        Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+        Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: NayColors.textMuted)),
       ]),
     );
   }
@@ -398,7 +398,7 @@ class _InventoryTabState extends State<_InventoryTab> {
     final state = AppScope.of(context);
     return Column(children: [
       Container(
-        color: Colors.white,
+        color: NayColors.surface,
         padding: const EdgeInsets.all(16),
         child: Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
           SegmentedButton<bool>(
@@ -446,7 +446,7 @@ class _InventoryTabState extends State<_InventoryTab> {
             FilledButton.icon(
               icon: const Icon(Icons.add),
               label: const Text('Nuevo producto'),
-              onPressed: () => showDialog(context: context, builder: (_) => const _ProductEditorDialog()),
+              onPressed: () => showAnimatedDialog(context: context, builder: (_) => const _ProductEditorDialog()),
             ),
             FilledButton.tonalIcon(
               icon: const Icon(Icons.trending_up),
@@ -512,7 +512,7 @@ class _InventoryTabState extends State<_InventoryTab> {
         final p = list[i];
         return Card(
           elevation: 0,
-          color: Colors.white,
+          color: NayColors.surface,
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(children: [
@@ -541,7 +541,7 @@ class _InventoryTabState extends State<_InventoryTab> {
                       ].join('  •  '),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style: TextStyle(fontSize: 12, color: NayColors.textMuted),
                     ),
                 ]),
               ),
@@ -584,7 +584,7 @@ class _InventoryTabState extends State<_InventoryTab> {
               IconButton(
                 tooltip: 'Editar producto',
                 icon: const Icon(Icons.edit_outlined),
-                onPressed: () => showDialog(context: context, builder: (_) => _ProductEditorDialog(product: p)),
+                onPressed: () => showAnimatedDialog(context: context, builder: (_) => _ProductEditorDialog(product: p)),
               ),
               IconButton(
                 tooltip: 'Eliminar producto',
@@ -620,7 +620,7 @@ class _InventoryTabState extends State<_InventoryTab> {
         final color = isIn ? Colors.green : (m.type == 'salida' ? Colors.red : Colors.orange);
         return Card(
           elevation: 0,
-          color: Colors.white,
+          color: NayColors.surface,
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: color.withValues(alpha: 0.12),
@@ -631,7 +631,7 @@ class _InventoryTabState extends State<_InventoryTab> {
             trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text(m.delta == 0 ? 'Eliminado (0 unid.)' : '${isIn ? '+' : ''}${m.delta} unid.',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: color)),
-              Text('Stock quedó en ${m.stockAfter}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              Text('Stock quedó en ${m.stockAfter}', style: TextStyle(fontSize: 12, color: NayColors.textMuted)),
             ]),
           ),
         );
@@ -772,9 +772,9 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
   late final TextEditingController _cost;
   late final TextEditingController _price;
   late final TextEditingController _stock;
-  late final TextEditingController _sizes;
   late final TextEditingController _image;
   late String _catId;
+  late List<String> _selectedSizes;
   late List<String> _colors;
   late Map<String, TextEditingController> _colorCtrls;
   late bool _active;
@@ -790,9 +790,9 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
     _cost = TextEditingController(text: p != null && p.costPrice > 0 ? p.costPrice.toStringAsFixed(2) : '');
     _price = TextEditingController(text: p != null ? p.price.toStringAsFixed(2) : '');
     _stock = TextEditingController(text: '${p?.stock ?? 10}');
-    _sizes = TextEditingController(text: p?.sizes.join(', ') ?? '');
     _image = TextEditingController(text: p?.image ?? '');
     _catId = p?.categoryId ?? (state.categories.isNotEmpty ? state.categories.first.id : 'casual');
+    _selectedSizes = List<String>.from(p?.sizes ?? []);
     _colors = List<String>.from(p?.colors ?? []);
     _colorCtrls = {
       for (final c in _colors) c: TextEditingController(text: '${p?.stockForColor(c) ?? 5}'),
@@ -808,7 +808,6 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
     _cost.dispose();
     _price.dispose();
     _stock.dispose();
-    _sizes.dispose();
     _image.dispose();
     for (final c in _colorCtrls.values) {
       c.dispose();
@@ -823,6 +822,39 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
     if (mounted) setState(() => _image.text = stored);
   }
 
+  Future<void> _addCustomSizeDialog() async {
+    final sizeCtrl = TextEditingController();
+    final isShoes = AppState.sizeGroupForCategory(_catId) == 'calzado';
+    final ok = await showAnimatedDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nueva talla'),
+        content: SizedBox(
+          width: 320,
+          child: TextField(
+            controller: sizeCtrl,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: isShoes ? 'Talla de calzado (ej. 33, 46)' : 'Talla de prenda (ej. 2XL, 3XL, 28)',
+            ),
+            onSubmitted: (_) => Navigator.pop(ctx, true),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Agregar talla')),
+        ],
+      ),
+    );
+    if (ok == true && sizeCtrl.text.trim().isNotEmpty && mounted) {
+      final size = sizeCtrl.text.trim();
+      await AppScope.read(context).addCustomSize(_catId, size);
+      if (mounted && !_selectedSizes.contains(size)) {
+        setState(() => _selectedSizes.add(size));
+      }
+    }
+  }
+
   Future<void> _addCustomColorDialog() async {
     final nameCtrl = TextEditingController();
     const swatches = [
@@ -831,7 +863,7 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
       0xFFFFCDD2, 0xFFE1BEE7, 0xFFB2DFDB, 0xFFFFECB3,
     ];
     var pickedHex = swatches.first;
-    final ok = await showDialog<bool>(
+    final ok = await showAnimatedDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
@@ -859,7 +891,7 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
                         shape: BoxShape.circle,
                         color: Color(hex),
                         border: Border.all(
-                          color: pickedHex == hex ? NayColors.primary : Colors.grey.shade400,
+                          color: pickedHex == hex ? NayColors.primary : Colors.white38,
                           width: pickedHex == hex ? 3 : 1,
                         ),
                       ),
@@ -1009,16 +1041,51 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
               ),
               const SizedBox(height: 14),
               Row(children: [
-                const Text('Tallas (separadas por coma):', style: TextStyle(fontWeight: FontWeight.w600)),
+                Text(
+                  'Tallas disponibles (${AppState.sizeGroupForCategory(_catId) == 'calzado' ? 'Calzado' : 'Ropa'}):',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 const Spacer(),
-                TextButton(onPressed: () => _sizes.text = 'XS, S, M, L, XL', child: const Text('Ropa')),
-                TextButton(onPressed: () => _sizes.text = '35, 36, 37, 38, 39, 40', child: const Text('Calzado')),
-                TextButton(onPressed: () => _sizes.clear(), child: const Text('Sin tallas')),
+                TextButton(
+                  onPressed: () => setState(() {
+                    final isShoes = AppState.sizeGroupForCategory(_catId) == 'calzado';
+                    _selectedSizes = isShoes
+                        ? ['36', '37', '38', '39', '40', '41', '42']
+                        : ['XS', 'S', 'M', 'L', 'XL'];
+                  }),
+                  child: const Text('Comunes'),
+                ),
+                TextButton(
+                  onPressed: () => setState(() => _selectedSizes.clear()),
+                  child: const Text('Sin tallas'),
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.straighten, size: 17),
+                  label: const Text('Agregar talla nueva'),
+                  onPressed: _addCustomSizeDialog,
+                ),
               ]),
-              TextFormField(
-                controller: _sizes,
-                decoration: const InputDecoration(hintText: 'Ej: XS, S, M, L, XL'),
-              ),
+              const SizedBox(height: 6),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final s in {...state.availableSizesForCategory(_catId), ..._selectedSizes})
+                  InputChip(
+                    label: Text(s, style: const TextStyle(fontSize: 12)),
+                    selected: _selectedSizes.contains(s),
+                    onSelected: (sel) => setState(() {
+                      if (sel) {
+                        if (!_selectedSizes.contains(s)) _selectedSizes.add(s);
+                      } else {
+                        _selectedSizes.remove(s);
+                      }
+                    }),
+                    deleteIcon: const Icon(Icons.close, size: 14),
+                    deleteButtonTooltipMessage: 'Eliminar talla $s',
+                    onDeleted: () async {
+                      await AppScope.read(context).removeSize(_catId, s);
+                      if (mounted) setState(() => _selectedSizes.remove(s));
+                    },
+                  ),
+              ]),
               const SizedBox(height: 14),
               Row(children: [
                 const Text('Colores disponibles:', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -1031,19 +1098,30 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
               ]),
               const SizedBox(height: 6),
               Wrap(spacing: 8, runSpacing: 8, children: [
-                for (final c in state.allColorNames)
-                  FilterChip(
+                for (final c in {...state.allColorNames, ..._colors})
+                  InputChip(
                     avatar: ColorDot(c, size: 16),
                     label: Text(c, style: const TextStyle(fontSize: 12)),
                     selected: _colors.contains(c),
                     onSelected: (sel) => setState(() {
                       if (sel) {
-                        _colors.add(c);
+                        if (!_colors.contains(c)) _colors.add(c);
                         _colorCtrls.putIfAbsent(c, () => TextEditingController(text: '5'));
                       } else {
                         _colors.remove(c);
                       }
                     }),
+                    deleteIcon: const Icon(Icons.close, size: 14),
+                    deleteButtonTooltipMessage: 'Eliminar color $c',
+                    onDeleted: () async {
+                      await AppScope.read(context).removeColor(c);
+                      if (mounted) {
+                        setState(() {
+                          _colors.remove(c);
+                          _colorCtrls.remove(c)?.dispose();
+                        });
+                      }
+                    },
                   ),
               ]),
               if (_colors.isNotEmpty) ...[
@@ -1084,7 +1162,7 @@ class _ProductEditorDialogState extends State<_ProductEditorDialog> {
         FilledButton(
           onPressed: () async {
             if (!_form.currentState!.validate()) return;
-            final sizes = _sizes.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+            final sizes = List<String>.from(_selectedSizes);
             final price = double.parse(_price.text.replaceAll(',', '.'));
             final cost = double.tryParse(_cost.text.replaceAll(',', '.')) ??
                 (price > 5 ? double.parse((price - 5).toStringAsFixed(2)) : 0);
@@ -1174,7 +1252,7 @@ class _SuppliersTabState extends State<_SuppliersTab> {
 
     return Column(children: [
       Container(
-        color: Colors.white,
+        color: NayColors.surface,
         padding: const EdgeInsets.all(16),
         child: Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
           SegmentedButton<bool>(
@@ -1196,7 +1274,7 @@ class _SuppliersTabState extends State<_SuppliersTab> {
                 _openSupplierDialog(context);
                 return;
               }
-              showDialog(context: context, builder: (_) => const _PurchaseDialog());
+              showAnimatedDialog(context: context, builder: (_) => const _PurchaseDialog());
             },
           ),
           OutlinedButton.icon(
@@ -1255,7 +1333,7 @@ class _SuppliersTabState extends State<_SuppliersTab> {
         final s = state.suppliers[i];
         return Card(
           elevation: 0,
-          color: Colors.white,
+          color: NayColors.surface,
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: NayColors.logoBg,
@@ -1305,7 +1383,7 @@ class _SuppliersTabState extends State<_SuppliersTab> {
         final c = state.purchases[i];
         return Card(
           elevation: 0,
-          color: Colors.white,
+          color: NayColors.surface,
           child: ExpansionTile(
             title: Text('${c.id} — ${c.supplierName}', style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('${fmtDate(c.date)} • ${c.totalUnits} unid.${c.invoiceRef.isNotEmpty ? ' • Fact. ${c.invoiceRef}' : ''}'),
@@ -1682,7 +1760,7 @@ class _CategoriesTab extends StatelessWidget {
       for (final c in state.categories) ...[
         Card(
           elevation: 0,
-          color: Colors.white,
+          color: NayColors.surface,
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: NayColors.logoBg,
@@ -1792,7 +1870,7 @@ class _CustomersTabState extends State<_CustomersTab> {
 
     return Column(children: [
       Container(
-        color: Colors.white,
+        color: NayColors.surface,
         padding: const EdgeInsets.all(16),
         child: Row(children: [
           const Text('Clientes y Cuentas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -1806,7 +1884,7 @@ class _CustomersTabState extends State<_CustomersTab> {
             ),
           ),
           const Spacer(),
-          Text('Total: ${filtered.length} usuario(s)', style: TextStyle(color: Colors.grey.shade700)),
+          Text('Total: ${filtered.length} usuario(s)', style: TextStyle(color: NayColors.textMuted)),
         ]),
       ),
       Expanded(
@@ -1822,7 +1900,7 @@ class _CustomersTabState extends State<_CustomersTab> {
             final lastOrder = userOrders.isNotEmpty ? userOrders.first : null;
             return Card(
               elevation: 0,
-              color: Colors.white,
+              color: NayColors.surface,
               child: ExpansionTile(
                 leading: CircleAvatar(
                   backgroundColor: u.isAdmin ? NayColors.primary : NayColors.logoBg,
@@ -1939,7 +2017,7 @@ class _OrdersTabState extends State<_OrdersTab> {
 
     return Column(children: [
       Container(
-        color: Colors.white,
+        color: NayColors.surface,
         padding: const EdgeInsets.all(16),
         child: Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
           SizedBox(
@@ -2053,7 +2131,7 @@ class _OrdersTabState extends State<_OrdersTab> {
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold, fontSize: 16, color: NayColors.primary)),
                             Text(bs(o.total, o.exchangeRate > 0 ? o.exchangeRate : rate),
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                style: TextStyle(fontSize: 12, color: NayColors.textMuted)),
                           ]),
                       childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       children: [
@@ -2192,7 +2270,7 @@ class _SettingsTabState extends State<_SettingsTab> {
     return ListView(padding: const EdgeInsets.all(24), children: [
       Card(
         elevation: 0,
-        color: Colors.white,
+        color: NayColors.surface,
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2203,7 +2281,7 @@ class _SettingsTabState extends State<_SettingsTab> {
               if (state.settings.lastRateUpdate != null)
                 Text(
                   'Última actualización (${state.settings.rateSource}): ${fmtDate(state.settings.lastRateUpdate!)}',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                  style: TextStyle(color: NayColors.textMuted, fontSize: 12),
                 ),
             ]),
             const SizedBox(height: 12),
@@ -2269,7 +2347,7 @@ class _SettingsTabState extends State<_SettingsTab> {
       const SizedBox(height: 16),
       Card(
         elevation: 0,
-        color: Colors.white,
+        color: NayColors.surface,
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2302,7 +2380,7 @@ class _SettingsTabState extends State<_SettingsTab> {
       const SizedBox(height: 16),
       Card(
         elevation: 0,
-        color: Colors.white,
+        color: NayColors.surface,
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2318,7 +2396,7 @@ class _SettingsTabState extends State<_SettingsTab> {
             const SizedBox(height: 8),
             Text(
               'Los cajeros solo pueden cobrar en Caja / Ventas y ver sus ventas del día (no ven ganancias ni pueden borrar nada).',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              style: TextStyle(color: NayColors.textMuted, fontSize: 13),
             ),
             const SizedBox(height: 10),
             for (final u in state.users.where((u) => u.isCashier))
@@ -2357,14 +2435,14 @@ class _SettingsTabState extends State<_SettingsTab> {
       const SizedBox(height: 16),
       Card(
         elevation: 0,
-        color: Colors.white,
+        color: NayColors.surface,
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Seguridad y Base de Datos local', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             SelectableText('Archivo de base de datos: ${LocalDb.file.path}',
-                style: TextStyle(color: Colors.grey.shade700, fontSize: 13)),
+                style: TextStyle(color: NayColors.textMuted, fontSize: 13)),
             const SizedBox(height: 14),
             Wrap(spacing: 12, runSpacing: 12, children: [
               OutlinedButton.icon(

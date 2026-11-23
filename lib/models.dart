@@ -217,6 +217,9 @@ class Settings {
   double freeShippingFrom; // USD
   List<DiscountRule> discounts;
   Map<String, int> customColors;
+  List<String> removedColors;
+  Map<String, List<String>> customSizes;
+  Map<String, List<String>> removedSizes;
 
   Settings({
     this.exchangeRate = 40.0,
@@ -227,8 +230,14 @@ class Settings {
     this.freeShippingFrom = 150,
     List<DiscountRule>? discounts,
     Map<String, int>? customColors,
+    List<String>? removedColors,
+    Map<String, List<String>>? customSizes,
+    Map<String, List<String>>? removedSizes,
   })  : discounts = discounts ?? [DiscountRule(3, 5), DiscountRule(5, 10), DiscountRule(10, 15)],
-        customColors = customColors ?? {};
+        customColors = customColors ?? {},
+        removedColors = removedColors ?? [],
+        customSizes = customSizes ?? {},
+        removedSizes = removedSizes ?? {};
 
   Map<String, dynamic> toJson() => {
         'exchangeRate': exchangeRate,
@@ -239,7 +248,18 @@ class Settings {
         'freeShippingFrom': freeShippingFrom,
         'discounts': discounts.map((d) => d.toJson()).toList(),
         'customColors': customColors,
+        'removedColors': removedColors,
+        'customSizes': customSizes,
+        'removedSizes': removedSizes,
       };
+
+  static Map<String, List<String>> _parseStringListMap(dynamic raw) {
+    if (raw is! Map) return {};
+    return {
+      for (final e in raw.entries)
+        e.key.toString(): (e.value as List? ?? []).map((x) => x.toString()).toList(),
+    };
+  }
 
   factory Settings.fromJson(Map<String, dynamic> j) {
     final rawColors = j['customColors'] as Map<String, dynamic>? ?? {};
@@ -252,6 +272,9 @@ class Settings {
       freeShippingFrom: (j['freeShippingFrom'] as num?)?.toDouble() ?? 150,
       discounts: (j['discounts'] as List?)?.map((e) => DiscountRule.fromJson(e)).toList(),
       customColors: rawColors.map((k, v) => MapEntry(k, (v as num).toInt())),
+      removedColors: List<String>.from(j['removedColors'] ?? []),
+      customSizes: _parseStringListMap(j['customSizes']),
+      removedSizes: _parseStringListMap(j['removedSizes']),
     );
   }
 }
