@@ -583,19 +583,29 @@ class AppState extends ChangeNotifier {
   bool get isLoggedIn => _user != null;
   bool get isAdmin => _user?.isAdmin ?? false;
   bool get isCashier => _user?.isCashier ?? false;
+  bool get isWarehouse => _user?.isWarehouse ?? false;
   bool get isStaff => _user?.isStaff ?? false;
 
-  StoredUser? findUser(String email) {
-    final e = email.trim().toLowerCase();
+  /// Busca un usuario por nombre de usuario o correo (acepta tanto 'admin' como 'admin@naysport.com').
+  StoredUser? findUser(String identifier) {
+    final id = identifier.trim().toLowerCase();
+    if (id.isEmpty) return null;
     for (final u in users) {
-      if (u.email.toLowerCase() == e) return u;
+      final stored = u.email.toLowerCase();
+      if (stored == id) return u;
+    }
+    if (!id.contains('@')) {
+      for (final u in users) {
+        final stored = u.email.toLowerCase();
+        if (stored.contains('@') && stored.split('@').first == id) return u;
+      }
     }
     return null;
   }
 
-  String? loginWithEmail(String email, String password) {
-    final u = findUser(email);
-    if (u == null || u.passwordHash != LocalDb.hash(password)) return 'Correo o contraseña incorrectos';
+  String? loginWithEmail(String identifier, String password) {
+    final u = findUser(identifier);
+    if (u == null || u.passwordHash != LocalDb.hash(password)) return 'Usuario o contraseña incorrectos';
     if (!u.active) return 'Esta cuenta fue desactivada por el administrador';
     _user = AppUser(name: u.name, email: u.email, phone: u.phone, role: u.role);
     notifyListeners();
@@ -609,7 +619,7 @@ class AppState extends ChangeNotifier {
     required String password,
     String role = 'cliente',
   }) async {
-    if (findUser(email) != null) return 'Ese correo ya está registrado';
+    if (findUser(email) != null) return 'Ese usuario ya está registrado';
     final u = StoredUser(
       name: name,
       email: email.trim(),

@@ -6,8 +6,6 @@ import '../theme.dart';
 import 'cashier_screen.dart';
 import 'home_screen.dart';
 
-final _emailRe = RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$');
-
 class LoginScreen extends StatefulWidget {
   /// true cuando aparece al abrir la app (redirige según rol y permite entrar como visitante).
   /// false cuando se abre desde el carrito o la tienda para iniciar sesión antes de pagar.
@@ -25,7 +23,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final u = AppScope.read(context).user!;
     final msg = u.isAdmin
         ? 'Sesión de administrador iniciada'
-        : (u.isCashier ? 'Bienvenido a Caja, ${u.name}' : 'Bienvenida, ${u.name}');
+        : (u.isCashier
+            ? 'Bienvenido a Caja, ${u.name}'
+            : (u.isWarehouse ? 'Bienvenido a Almacén, ${u.name}' : 'Bienvenida, ${u.name}'));
     showSnack(context, msg);
 
     if (!widget.isEntryGate) {
@@ -35,7 +35,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final Widget next = u.isAdmin
         ? const AdminScreen()
-        : (u.isCashier ? const CashierScreen() : const HomeScreen());
+        : (u.isWarehouse
+            ? const AdminScreen(warehouseOnly: true)
+            : (u.isCashier ? const CashierScreen() : const HomeScreen()));
     Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => next));
   }
 
@@ -138,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Text(
                       _registerMode
                           ? 'Completa tus datos para comprar en línea'
-                          : 'Ingresa como Cliente, Cajero o Administrador',
+                          : 'Bienvenido de vuelta a NaySport',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: NayColors.textMuted),
                     ),
@@ -235,8 +237,15 @@ class _LoginFormState extends State<_LoginForm> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         TextFormField(
           controller: _email,
-          decoration: const InputDecoration(labelText: 'Correo electrónico', prefixIcon: Icon(Icons.email_outlined)),
-          validator: (v) => _emailRe.hasMatch(v?.trim() ?? '') ? null : 'Correo no válido',
+          decoration: const InputDecoration(
+            labelText: 'Usuario',
+            prefixIcon: Icon(Icons.person_outline),
+          ),
+          validator: (v) {
+            final clean = v?.trim() ?? '';
+            if (clean.length < 3 || clean.contains(' ')) return 'Ingresa un usuario válido';
+            return null;
+          },
         ),
         const SizedBox(height: 14),
         TextFormField(
@@ -348,8 +357,15 @@ class _RegisterFormState extends State<_RegisterForm> {
         const SizedBox(height: 14),
         TextFormField(
           controller: _email,
-          decoration: const InputDecoration(labelText: 'Correo electrónico', prefixIcon: Icon(Icons.email_outlined)),
-          validator: (v) => _emailRe.hasMatch(v?.trim() ?? '') ? null : 'Correo no válido',
+          decoration: const InputDecoration(
+            labelText: 'Usuario',
+            prefixIcon: Icon(Icons.person_outline),
+          ),
+          validator: (v) {
+            final clean = v?.trim() ?? '';
+            if (clean.length < 3 || clean.contains(' ')) return 'Ingresa un usuario válido';
+            return null;
+          },
         ),
         const SizedBox(height: 14),
         TextFormField(

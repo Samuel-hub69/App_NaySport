@@ -13,7 +13,8 @@ import '../theme.dart';
 import '../win_utils.dart';
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({super.key});
+  final bool warehouseOnly;
+  const AdminScreen({super.key, this.warehouseOnly = false});
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -25,14 +26,25 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
+    final isWarehouse = widget.warehouseOnly;
     return Scaffold(
       appBar: AppBar(
-        title: const Row(children: [
-          Icon(Icons.admin_panel_settings, color: NayColors.primary),
-          SizedBox(width: 10),
-          Text('Panel de Administración — NaySport', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Row(children: [
+          Icon(isWarehouse ? Icons.inventory_2 : Icons.admin_panel_settings, color: NayColors.primary),
+          const SizedBox(width: 10),
+          Text(
+            isWarehouse ? 'Panel de Almacén — NaySport' : 'Panel de Administración — NaySport',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
         ]),
         actions: [
+          if (isWarehouse) ...[
+            Chip(
+              avatar: const Icon(Icons.inventory_2_outlined, size: 16, color: NayColors.accent),
+              label: Text('Almacenista: ${state.user?.name ?? ''}'),
+            ),
+            const SizedBox(width: 10),
+          ],
           Chip(
             avatar: const Icon(Icons.currency_exchange, size: 18, color: NayColors.primary),
             backgroundColor: NayColors.logoBg,
@@ -42,12 +54,14 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
           ),
           const SizedBox(width: 10),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.storefront_outlined, size: 18),
-            label: const Text('Ver tienda'),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
-          ),
-          const SizedBox(width: 8),
+          if (!isWarehouse) ...[
+            OutlinedButton.icon(
+              icon: const Icon(Icons.storefront_outlined, size: 18),
+              label: const Text('Ver tienda'),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HomeScreen())),
+            ),
+            const SizedBox(width: 8),
+          ],
           TextButton.icon(
             icon: const Icon(Icons.logout, size: 18),
             label: const Text('Cerrar sesión'),
@@ -68,29 +82,41 @@ class _AdminScreenState extends State<AdminScreen> {
           backgroundColor: const Color(0xFF140D12),
           selectedIndex: _tab,
           onDestinationSelected: (i) => setState(() => _tab = i),
-          destinations: const [
-            NavigationRailDestination(icon: Icon(Icons.dashboard_outlined), label: Text('Resumen')),
-            NavigationRailDestination(icon: Icon(Icons.point_of_sale), label: Text('Caja / Ventas')),
-            NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), label: Text('Stock y Kardex')),
-            NavigationRailDestination(icon: Icon(Icons.local_shipping_outlined), label: Text('Proveedores')),
-            NavigationRailDestination(icon: Icon(Icons.category_outlined), label: Text('Categorías')),
-            NavigationRailDestination(icon: Icon(Icons.people_outline), label: Text('Clientes')),
-            NavigationRailDestination(icon: Icon(Icons.receipt_long_outlined), label: Text('Historial y PDF')),
-            NavigationRailDestination(icon: Icon(Icons.tune_outlined), label: Text('Config y BCV')),
-          ],
+          destinations: isWarehouse
+              ? const [
+                  NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), label: Text('Stock y Kardex')),
+                  NavigationRailDestination(icon: Icon(Icons.local_shipping_outlined), label: Text('Proveedores')),
+                  NavigationRailDestination(icon: Icon(Icons.category_outlined), label: Text('Categorías')),
+                ]
+              : const [
+                  NavigationRailDestination(icon: Icon(Icons.dashboard_outlined), label: Text('Resumen')),
+                  NavigationRailDestination(icon: Icon(Icons.point_of_sale), label: Text('Caja / Ventas')),
+                  NavigationRailDestination(icon: Icon(Icons.inventory_2_outlined), label: Text('Stock y Kardex')),
+                  NavigationRailDestination(icon: Icon(Icons.local_shipping_outlined), label: Text('Proveedores')),
+                  NavigationRailDestination(icon: Icon(Icons.category_outlined), label: Text('Categorías')),
+                  NavigationRailDestination(icon: Icon(Icons.people_outline), label: Text('Clientes')),
+                  NavigationRailDestination(icon: Icon(Icons.receipt_long_outlined), label: Text('Historial y PDF')),
+                  NavigationRailDestination(icon: Icon(Icons.tune_outlined), label: Text('Config y BCV')),
+                ],
         ),
         const VerticalDivider(width: 1),
         Expanded(
-          child: switch (_tab) {
-            0 => _DashboardTab(onGoTab: (i) => setState(() => _tab = i)),
-            1 => const CashierPosView(),
-            2 => const _InventoryTab(),
-            3 => const _SuppliersTab(),
-            4 => const _CategoriesTab(),
-            5 => const _CustomersTab(),
-            6 => const _OrdersTab(),
-            _ => const _SettingsTab(),
-          },
+          child: isWarehouse
+              ? switch (_tab) {
+                  0 => const _InventoryTab(),
+                  1 => const _SuppliersTab(),
+                  _ => const _CategoriesTab(),
+                }
+              : switch (_tab) {
+                  0 => _DashboardTab(onGoTab: (i) => setState(() => _tab = i)),
+                  1 => const CashierPosView(),
+                  2 => const _InventoryTab(),
+                  3 => const _SuppliersTab(),
+                  4 => const _CategoriesTab(),
+                  5 => const _CustomersTab(),
+                  6 => const _OrdersTab(),
+                  _ => const _SettingsTab(),
+                },
         ),
       ]),
     );
@@ -3226,50 +3252,92 @@ class _SettingsTabState extends State<_SettingsTab> {
           padding: const EdgeInsets.all(20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              const Text('Personal de Caja (Cajeros)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text('Equipo y Usuarios', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const Spacer(),
               FilledButton.tonalIcon(
                 icon: const Icon(Icons.person_add),
-                label: const Text('Nuevo cajero'),
-                onPressed: () => _createCashierDialog(context),
+                label: const Text('Nuevo usuario'),
+                onPressed: () => _createStaffUserDialog(context),
               ),
             ]),
             const SizedBox(height: 8),
-            Text(
-              'Los cajeros solo pueden cobrar en Caja / Ventas y ver sus ventas del día (no ven ganancias ni pueden borrar nada).',
+            const Text(
+              'Administra el acceso y el rol de cada integrante de tu tienda (Cajero, Almacenista o Administrador).',
               style: TextStyle(color: NayColors.textMuted, fontSize: 13),
             ),
-            const SizedBox(height: 10),
-            for (final u in state.users.where((u) => u.isCashier))
-              ListTile(
-                dense: true,
-                leading: CircleAvatar(
-                  backgroundColor: u.active ? Colors.teal.shade900 : NayColors.surfaceElevated,
-                  child: Icon(Icons.badge, color: u.active ? Colors.teal : Colors.black54),
-                ),
-                title: Text(u.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text('${u.email}${u.phone.isNotEmpty ? ' • ${u.phone}' : ''}'),
-                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Switch(
-                    value: u.active,
-                    onChanged: (v) {
-                      u.active = v;
-                      state.commit();
-                    },
+            const SizedBox(height: 12),
+            for (final u in state.users.where((u) => u.isStaff))
+              Builder(builder: (_) {
+                final isSelf = state.user?.email.toLowerCase() == u.email.toLowerCase();
+                final roleColor = switch (u.role) {
+                  'admin' => NayColors.primary,
+                  'almacenista' => Colors.amber,
+                  _ => Colors.tealAccent,
+                };
+                final roleIcon = switch (u.role) {
+                  'admin' => Icons.admin_panel_settings_outlined,
+                  'almacenista' => Icons.inventory_2_outlined,
+                  _ => Icons.badge_outlined,
+                };
+                return ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  leading: CircleAvatar(
+                    backgroundColor: u.active ? roleColor.withValues(alpha: 0.18) : NayColors.surfaceElevated,
+                    child: Icon(roleIcon, color: u.active ? roleColor : NayColors.textMuted, size: 20),
                   ),
-                  IconButton(
-                    tooltip: 'Eliminar cajero',
-                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                    onPressed: () async {
-                      final ok = await _confirmDialog(context, '¿Eliminar cajero "${u.name}"?', '');
-                      if (ok) {
-                        state.users.remove(u);
-                        await state.commit();
-                      }
-                    },
-                  ),
-                ]),
-              ),
+                  title: Row(children: [
+                    Flexible(
+                      child: Text(u.name,
+                          overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: roleColor.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: roleColor.withValues(alpha: 0.4)),
+                      ),
+                      child: Text(
+                        u.roleLabel,
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: roleColor),
+                      ),
+                    ),
+                    if (isSelf) ...[
+                      const SizedBox(width: 6),
+                      const Text('(Tú)', style: TextStyle(fontSize: 11.5, color: NayColors.textMuted)),
+                    ],
+                  ]),
+                  subtitle: Text('${u.email}${u.phone.isNotEmpty ? ' • ${u.phone}' : ''}'),
+                  trailing: isSelf
+                      ? const SizedBox.shrink()
+                      : Row(mainAxisSize: MainAxisSize.min, children: [
+                          Switch(
+                            value: u.active,
+                            onChanged: (v) {
+                              u.active = v;
+                              state.commit();
+                            },
+                          ),
+                          IconButton(
+                            tooltip: 'Eliminar usuario',
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                            onPressed: () async {
+                              final ok = await _confirmDialog(
+                                context,
+                                '¿Eliminar usuario "${u.name}"?',
+                                'Perderá el acceso al sistema de inmediato.',
+                              );
+                              if (ok) {
+                                state.users.remove(u);
+                                await state.commit();
+                              }
+                            },
+                          ),
+                        ]),
+                );
+              }),
           ]),
         ),
       ),
@@ -3384,71 +3452,167 @@ class _SettingsTabState extends State<_SettingsTab> {
     }
   }
 
-  Future<void> _createCashierDialog(BuildContext context) async {
+  Future<void> _createStaffUserDialog(BuildContext context) async {
     final form = GlobalKey<FormState>();
     final nameCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
+    final userCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
     final passCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    String selectedRole = 'cajero';
+
+    const roleOptions = [
+      (
+        id: 'cajero',
+        label: 'Cajero',
+        desc: 'Caja y ventas',
+        icon: Icons.point_of_sale,
+        color: Colors.tealAccent,
+      ),
+      (
+        id: 'almacenista',
+        label: 'Almacenista',
+        desc: 'Stock y Kardex',
+        icon: Icons.inventory_2_outlined,
+        color: Colors.amber,
+      ),
+      (
+        id: 'admin',
+        label: 'Administrador',
+        desc: 'Acceso total',
+        icon: Icons.admin_panel_settings_outlined,
+        color: NayColors.primary,
+      ),
+    ];
+
+    final ok = await showAnimatedDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Crear cuenta de Cajero'),
-        content: SizedBox(
-          width: 400,
-          child: Form(
-            key: form,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              TextFormField(
-                controller: nameCtrl,
-                inputFormatters: [nameInputFormatter],
-                decoration: const InputDecoration(labelText: 'Nombre completo'),
-                validator: validateFullName,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Registrar nuevo usuario'),
+          content: SizedBox(
+            width: 440,
+            child: Form(
+              key: form,
+              child: SingleChildScrollView(
+                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  TextFormField(
+                    controller: nameCtrl,
+                    inputFormatters: [nameInputFormatter],
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre completo',
+                      prefixIcon: Icon(Icons.badge_outlined),
+                    ),
+                    validator: validateFullName,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: userCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Usuario',
+                      hintText: 'Ej. maria.almacen o carlos.caja',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    validator: (v) {
+                      final clean = v?.trim() ?? '';
+                      if (clean.length < 3) return 'Mínimo 3 caracteres';
+                      if (clean.contains(' ')) return 'El usuario no debe tener espacios';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Rol asignado', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    for (var i = 0; i < roleOptions.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 8),
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => setDialogState(() => selectedRole = roleOptions[i].id),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: selectedRole == roleOptions[i].id
+                                  ? roleOptions[i].color.withValues(alpha: 0.16)
+                                  : NayColors.surfaceElevated,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: selectedRole == roleOptions[i].id ? roleOptions[i].color : NayColors.border,
+                                width: selectedRole == roleOptions[i].id ? 1.8 : 1,
+                              ),
+                            ),
+                            child: Column(children: [
+                              Icon(roleOptions[i].icon, color: roleOptions[i].color, size: 22),
+                              const SizedBox(height: 4),
+                              Text(
+                                roleOptions[i].label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                roleOptions[i].desc,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 10.5, color: NayColors.textMuted),
+                              ),
+                            ]),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ]),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: phoneCtrl,
+                    inputFormatters: const [PlusDigitsPhoneFormatter()],
+                    decoration: const InputDecoration(
+                      labelText: 'Teléfono (opcional)',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                    ),
+                    validator: (v) => (v ?? '').trim().isEmpty ? null : validatePhone(v),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: passCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Contraseña (mín. 8 caracteres)',
+                      prefixIcon: Icon(Icons.lock_outline),
+                    ),
+                    validator: (v) => (v ?? '').length < 8 ? 'Mínimo 8 caracteres' : null,
+                  ),
+                ]),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: emailCtrl,
-                decoration: const InputDecoration(labelText: 'Correo para iniciar sesión'),
-                validator: (v) => RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$').hasMatch(v?.trim() ?? '') ? null : 'Correo no válido',
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: phoneCtrl,
-                inputFormatters: const [PlusDigitsPhoneFormatter()],
-                decoration: const InputDecoration(labelText: 'Teléfono (opcional)'),
-                validator: (v) => (v ?? '').trim().isEmpty ? null : validatePhone(v),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: passCtrl,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Contraseña (mín. 8 caracteres)'),
-                validator: (v) => (v ?? '').length < 8 ? 'Mínimo 8 caracteres' : null,
-              ),
-            ]),
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: () {
+                if (form.currentState!.validate()) Navigator.pop(ctx, true);
+              },
+              child: const Text('Crear usuario'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () {
-              if (form.currentState!.validate()) Navigator.pop(ctx, true);
-            },
-            child: const Text('Crear cajero'),
-          ),
-        ],
       ),
     );
     if (ok == true && context.mounted) {
       final err = await AppScope.read(context).register(
         name: nameCtrl.text.trim(),
-        email: emailCtrl.text.trim(),
+        email: userCtrl.text.trim(),
         phone: phoneCtrl.text.trim(),
         password: passCtrl.text,
-        role: 'cajero',
+        role: selectedRole,
       );
       if (!context.mounted) return;
-      showSnack(context, err ?? 'Cajero creado correctamente', error: err != null);
+      final label = switch (selectedRole) {
+        'admin' => 'Administrador',
+        'almacenista' => 'Almacenista',
+        _ => 'Cajero',
+      };
+      showSnack(context, err ?? '$label creado correctamente', error: err != null);
     }
   }
 }

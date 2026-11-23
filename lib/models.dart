@@ -359,10 +359,10 @@ class Settings {
 
 class StoredUser {
   String name;
-  final String email;
+  final String email; // usuario o correo de inicio de sesión
   String phone;
   String passwordHash;
-  String role; // 'admin' | 'cajero' | 'cliente'
+  String role; // 'admin' | 'cajero' | 'almacenista' | 'cliente'
   bool active;
   final DateTime createdAt;
 
@@ -378,6 +378,15 @@ class StoredUser {
 
   bool get isAdmin => role == 'admin';
   bool get isCashier => role == 'cajero';
+  bool get isWarehouse => role == 'almacenista';
+  bool get isStaff => isAdmin || isCashier || isWarehouse;
+
+  String get roleLabel => switch (role) {
+        'admin' => 'Administrador',
+        'cajero' => 'Cajero',
+        'almacenista' => 'Almacenista',
+        _ => 'Cliente',
+      };
 
   Map<String, dynamic> toJson() => {
         'name': name,
@@ -404,12 +413,13 @@ class AppUser {
   final String name;
   final String email;
   final String phone;
-  final String role; // 'admin' | 'cajero' | 'cliente'
+  final String role; // 'admin' | 'cajero' | 'almacenista' | 'cliente'
   const AppUser({required this.name, required this.email, this.phone = '', this.role = 'cliente'});
 
   bool get isAdmin => role == 'admin';
   bool get isCashier => role == 'cajero';
-  bool get isStaff => isAdmin || isCashier;
+  bool get isWarehouse => role == 'almacenista';
+  bool get isStaff => isAdmin || isCashier || isWarehouse;
 }
 
 class OrderLine {

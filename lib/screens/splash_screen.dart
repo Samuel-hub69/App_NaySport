@@ -151,13 +151,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     return Scaffold(
       backgroundColor: const Color(0xFF140B10),
       body: Container(
-        decoration: BoxDecoration(
-          gradient: const RadialGradient(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
             center: Alignment(0, -0.18),
             radius: 0.95,
             colors: [Color(0xFF2D1422), Color(0xFF160B12), Color(0xFF0A0608)],
           ),
-          border: Border.all(color: NayColors.primary.withValues(alpha: 0.45)),
         ),
         child: Center(
           child: RepaintBoundary(
